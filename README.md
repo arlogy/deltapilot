@@ -8,6 +8,8 @@ deltapilot supports communication via a CLI-accessible socket client or an HTTP/
 
 ## Architecture diagram
 
+*The project is currently a work in progress, with architecture diagram features not yet implemented.*
+
 ```
 +------------+ +--------+ +--------+
 | Go library | | Socket | |  HTTP  |
@@ -31,16 +33,15 @@ deltapilot supports communication via a CLI-accessible socket client or an HTTP/
 |                       deltapilot                        |
 | [core features, storage logic, transport adapters, ...] |
 +---------------------------------------------------------+
-
-- the Go library provides Go applications with direct access to all exposed functionality
-- the socket client is available through the CLI
-- the socket server is a long-running process that handles requests from socket clients and returns responses
-- the backend layer is a set of shared components
-- the HTTP client could be a web browser or any HTTP-compatible application
-- the HTTP server is a long-running process that handles requests from HTTP clients and returns responses
-
-note: both the socket and HTTP servers run as daemons
 ```
+
+- The Go library provides Go applications with direct access to all exposed functionality.
+- The socket client is available through the CLI.
+- The socket server is a long-running process that handles requests from socket clients and returns responses.
+- The backend layer is a set of shared components.
+- The HTTP client could be a web browser or any HTTP-compatible application.
+- The HTTP server is a long-running process that handles requests from HTTP clients and returns responses.
+- Note: both the socket and HTTP servers run as daemons.
 
 ## Concepts
 
