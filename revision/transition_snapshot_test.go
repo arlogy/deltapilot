@@ -65,7 +65,7 @@ func TestNewTransitionSnapshot(t *testing.T) {
 }
 
 func TestPlanTransitionTo(t *testing.T) {
-	t.Run("builds snapshot transition plan", func(t *testing.T) {
+	t.Run("builds a transition plan for a snapshot", func(t *testing.T) {
 		check := func(targetData []byte) {
 			targetSource := bytes.Clone(targetData)
 
@@ -96,12 +96,11 @@ func TestPlanTransitionTo(t *testing.T) {
 
 func TestTransitionSnapshotClone(t *testing.T) {
 	t.Run("creates a snapshot copy", func(t *testing.T) {
-		check := func(targetData []byte) {
+		check := func(baselineData []byte, targetData []byte) {
 			id := testutils.GenerateID(t)
 			scopeID := testutils.GenerateID(t)
 			resourceID := testutils.GenerateID(t)
 			variantID := testutils.GenerateID(t)
-			baselineData := testutils.GenerateBytes(t)
 
 			createTimeZone := testutils.GenerateTimeZone()
 			createdAt := time.Now().In(createTimeZone)
@@ -145,17 +144,18 @@ func TestTransitionSnapshotClone(t *testing.T) {
 		}
 
 		// use individual calls instead of a loop so that each case gets isolated arguments
-		check(nil)
-		check(testutils.GenerateBytes(t))
+		check(nil, nil)
+		check(nil, testutils.GenerateBytes(t))
+		check(testutils.GenerateBytes(t), nil)
+		check(testutils.GenerateBytes(t), testutils.GenerateBytes(t))
 	})
 
 	t.Run("creates a copy that can be modified independently of the original", func(t *testing.T) {
-		check := func(targetData []byte) {
+		check := func(baselineData []byte, targetData []byte) {
 			id := testutils.GenerateID(t)
 			scopeID := testutils.GenerateID(t)
 			resourceID := testutils.GenerateID(t)
 			variantID := testutils.GenerateID(t)
-			baselineData := testutils.GenerateBytes(t)
 			createdAt := time.Now()
 
 			time.Sleep(1 * time.Millisecond) // ensure updatedAt differs from createdAt, for test data variety
@@ -207,7 +207,9 @@ func TestTransitionSnapshotClone(t *testing.T) {
 		}
 
 		// use individual calls instead of a loop so that each case gets isolated arguments
-		check(nil)
-		check(testutils.GenerateBytes(t))
+		check(nil, nil)
+		check(nil, testutils.GenerateBytes(t))
+		check(testutils.GenerateBytes(t), nil)
+		check(testutils.GenerateBytes(t), testutils.GenerateBytes(t))
 	})
 }

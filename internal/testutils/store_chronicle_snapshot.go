@@ -106,7 +106,8 @@ func TestChronicleStoreCanShareState(
 ) {
 	t.Run("returns "+fmt.Sprintf("%t", stateSharable), func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			testStateSharing := func(store storage.ChronicleStore) {
 				for range ScenarioRepeatCount {
@@ -188,7 +189,8 @@ func TestChronicleStoreAddSnapshot(
 
 	t.Run("rejects a nil snapshot", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			testAddNilSnapshot := func(store storage.ChronicleStore) {
 				for range ScenarioRepeatCount {
@@ -380,7 +382,8 @@ func TestChronicleStoreGetByID(
 
 	t.Run("rejects an unknown snapshot ID", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			unknownID := GenerateID(t)
 
@@ -516,7 +519,8 @@ func TestChronicleStoreGetByScopeID(
 
 	t.Run("yields an empty snapshot slice for an unknown scope ID", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			unknownScopeID := GeneratePointerID(t)
 
@@ -705,9 +709,8 @@ func TestChronicleStoreGetByScopeAndResourceAndVariant(
 	t.Run("yields an empty snapshot slice for an unknown scope ID / resource ID / variant ID"+
 		" combination", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
-
-			resourceID := fixture.resourceID
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			unknownScopeID := GeneratePointerID(t)
 			unknownResourceID := GenerateID(t)
@@ -977,9 +980,10 @@ func TestChronicleStoreMapsID(
 
 	t.Run("indicates whether a snapshot exists for an ID", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
-			id1, id2 := fixture.id1, fixture.id2
+			pAttrsID1, pAttrsID2 := fixture.pAttrsID1, fixture.pAttrsID2
 
 			unknownID := GenerateID(t)
 
@@ -1005,13 +1009,13 @@ func TestChronicleStoreMapsID(
 
 			fixture.withStore1(func(store storage.ChronicleStore) {
 				testMapsUnknownID(store)
-				testMapsKnownID(store, id1)
+				testMapsKnownID(store, pAttrsID1)
 			})
 
 			fixture.withStoreN(func(store storage.ChronicleStore) {
 				testMapsUnknownID(store)
-				testMapsKnownID(store, id1)
-				testMapsKnownID(store, id2)
+				testMapsKnownID(store, pAttrsID1)
+				testMapsKnownID(store, pAttrsID2)
 			})
 		}
 
@@ -1081,7 +1085,8 @@ func TestChronicleStoreMapsScopeID(
 
 	t.Run("indicates whether a snapshot exists for a scope ID", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			unknownScopeID := GeneratePointerID(t)
 
@@ -1183,9 +1188,8 @@ func TestChronicleStoreMapsScopeAndResourceAndVariant(
 	t.Run("indicates whether a snapshot exists for a scope ID / resource ID / variant ID"+
 		" combination", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
-
-			resourceID := fixture.resourceID
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			unknownScopeID := GeneratePointerID(t)
 			unknownResourceID := GenerateID(t)
@@ -1321,9 +1325,10 @@ func TestChronicleStoreMapsScopeAndResourceAndVariant(
 func TestChronicleStoreDeleteByID(t *testing.T, newStore func(t *testing.T) storage.ChronicleStore) {
 	t.Run("deletes the snapshot corresponding to an ID", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
-			id1, id2 := fixture.id1, fixture.id2
+			pAttrsID1, pAttrsID2 := fixture.pAttrsID1, fixture.pAttrsID2
 
 			unknownID := GenerateID(t)
 
@@ -1353,13 +1358,13 @@ func TestChronicleStoreDeleteByID(t *testing.T, newStore func(t *testing.T) stor
 
 			fixture.withStore1(func(store storage.ChronicleStore) {
 				testDeleteByUnknownID(store)
-				testDeleteByKnownID(store, id1)
+				testDeleteByKnownID(store, pAttrsID1)
 			})
 
 			fixture.withStoreN(func(store storage.ChronicleStore) {
 				testDeleteByUnknownID(store)
-				testDeleteByKnownID(store, id1)
-				testDeleteByKnownID(store, id2)
+				testDeleteByKnownID(store, pAttrsID1)
+				testDeleteByKnownID(store, pAttrsID2)
 			})
 		}
 
@@ -1419,7 +1424,8 @@ func TestChronicleStoreDeleteByID(t *testing.T, newStore func(t *testing.T) stor
 func TestChronicleStoreDeleteByScopeID(t *testing.T, newStore func(t *testing.T) storage.ChronicleStore) {
 	t.Run("deletes the snapshots corresponding to a scope ID", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			unknownScopeID := GeneratePointerID(t)
 
@@ -1537,9 +1543,8 @@ func TestChronicleStoreDeleteByScopeAndResourceAndVariant(
 	t.Run("deletes the snapshots corresponding to a scope ID / resource ID / variant ID"+
 		" combination", func(t *testing.T) {
 		check := func(scopeID *string, variantID *string, data []byte) {
-			fixture := setupChronicleStoreFixture(t, newStore, scopeID, variantID, data)
-
-			resourceID := fixture.resourceID
+			resourceID := GenerateID(t)
+			fixture := chronicleStoreFixture(t, newStore, resourceID, scopeID, variantID, data)
 
 			unknownScopeID := GeneratePointerID(t)
 			unknownResourceID := GenerateID(t)
@@ -1764,76 +1769,23 @@ func chronicleSnapshots2IDs(snapshots []*revision.ChronicleSnapshot) []string {
 	return ids
 }
 
-type chronicleStoreFixtureData struct {
-	id1        string
-	id2        string
-	resourceID string
-
-	withStore0 func(fn func(store storage.ChronicleStore))
-	withStore1 func(fn func(store storage.ChronicleStore))
-	withStoreN func(fn func(store storage.ChronicleStore))
-}
-
-func setupChronicleStoreFixture(
+func chronicleStoreFixture(
 	t *testing.T,
 	newStore func(t *testing.T) storage.ChronicleStore,
+	resourceID string,
 	scopeID *string,
 	variantID *string,
 	data []byte,
-) chronicleStoreFixtureData {
-	id1 := GenerateID(t)
-	id2 := GenerateID(t)
-	resourceID := GenerateID(t)
-
-	snapshot1 := revision.NewChronicleSnapshot(id1, scopeID, resourceID, variantID, data)
-	snapshot2 := GenerateChronicleSnapshotItem(t)
-	snapshot3 := revision.NewChronicleSnapshot(id2, scopeID, resourceID, variantID, data)
-
-	return chronicleStoreFixtureData{
-		id1:        id1,
-		id2:        id2,
-		resourceID: resourceID,
-
-		// store0, store1 and storeN are created within their respective callbacks and cleaned up when the
-		// callbacks return, so that the stores remain independent and do not affect one another. Indeed, as
-		// implied by storage.ChronicleStore.CanShareState(), different store instances may share the same
-		// underlying state when tested against a single storage backend (e.g. a database).
-
-		withStore0: func(fn func(store storage.ChronicleStore)) {
-			store0 := newStore(t) // empty store
-			fn(store0)
-		},
-
-		withStore1: func(fn func(store storage.ChronicleStore)) {
-			store1 := newStore(t) // store with one snapshot
-			for i, snapshot := range []*revision.ChronicleSnapshot{snapshot1} {
-				err := store1.AddSnapshot(snapshot)
-				if err != nil {
-					t.Fatalf(
-						"failed to add snapshot from index %d to store1: %v",
-						i,
-						failures.AsErrorWithSemantics(err),
-					)
-				}
-			}
-			defer CleanupStore(t, store1, []string{snapshot1.ID})
-			fn(store1)
-		},
-
-		withStoreN: func(fn func(store storage.ChronicleStore)) {
-			storeN := newStore(t) // store with several snapshots
-			for i, snapshot := range []*revision.ChronicleSnapshot{snapshot1, snapshot2, snapshot3} {
-				err := storeN.AddSnapshot(snapshot)
-				if err != nil {
-					t.Fatalf(
-						"failed to add snapshot from index %d to storeN: %v",
-						i,
-						failures.AsErrorWithSemantics(err),
-					)
-				}
-			}
-			defer CleanupStore(t, storeN, []string{snapshot1.ID, snapshot2.ID, snapshot3.ID})
-			fn(storeN)
-		},
+) storeFixtureData[storage.ChronicleStore] {
+	newSnapshot := func(t *testing.T, preserveAttributes bool) (string, *revision.ChronicleSnapshot) {
+		switch preserveAttributes {
+		case true:
+			id := GenerateID(t) // only ID is generated
+			return id, revision.NewChronicleSnapshot(id, scopeID, resourceID, variantID, data)
+		default:
+			snapshot := GenerateChronicleSnapshotItem(t) // all attributes are generated
+			return snapshot.ID, snapshot
+		}
 	}
+	return NewStoreFixture(t, newStore, newSnapshot)
 }

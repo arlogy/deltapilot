@@ -55,20 +55,23 @@ are several types of snapshots.
 - It is intended to be immutable.
 
 `TransitionSnapshot`
-- A snapshot capturing a resource transition from an optional baseline state to a required target state, with
-both states initialized during snapshot creation.
-- Because the baseline state can be set only once through the API, the following scenarios are possible.
-    - Baseline state known; target state expected to remain unchanged after baseline establishment: in a
-    review workflow for example, the target state may represent the desired state of the resource relative to
-    its baseline state. The proposed changes would then be the differences between the two states.
-    - Baseline state known; target state expected to change after baseline establishment: in a review workflow
-    for example, the state transition would be evaluated in the same way as when the target state is expected
-    to remain unchanged. However, reviewing a target state recorded at a different time than the baseline is
-    more suitable for evaluating whether the final proposed target remains relevant relative to the baseline,
-    such as when repairs made to a system must be controlled relative to the baseline condition.
-    - Baseline state unknown; target state expected to either remain unchanged or change after baseline
-    establishment: in a review workflow for example, the target state may represent a new state proposed for
-    review against another reference state, such as a centralized or database state.
+- A snapshot capturing a resource transition from a baseline state to a target state.
+- Both states are initialized during snapshot creation.
+- The baseline state can be set only once through the API, whereas the target state may evolve; this leads to
+the following scenarios.
+    - When the target state is expected to remain unchanged after baseline establishment: in a review workflow
+    for example, the target state may represent the desired state of the resource relative to its baseline
+    state. The proposed changes would then be the differences between the two states.
+    - When the target state may change after baseline establishment: in a review workflow for example, the
+    state transition would be evaluated in the same way as when the target state is expected to remain
+    unchanged. However, allowing the target state to be updated over time is more suitable when the final
+    target state may not be fully known at snapshot creation time, such as when repairs are made to a system
+    incrementally and its new state is recorded after each step. In this case, the review workflow would
+    actually evaluate whether the final target state is appropriate, ensuring that the repairs are effective
+    given the baseline condition.
+    - Note: in both cases, when the baseline state is `nil`, the target state may represent a new state
+    proposed for review against an external reference state, such as a state maintained centrally in a
+    database.
 
 ### Snapshot storage
 
@@ -78,7 +81,7 @@ In-memory stores are useful for rapid development or quick testing.
 
 Database stores are recommended for production, with the following considerations in mind.
 - Go models.
-    - We could have stored snapshot `[]byte` data fields into a separate table structure keyed by a computed
+    - We could have modeled snapshot `[]byte` data fields as a separate structure keyed by a computed
     identifier, allowing identical snapshot data to be shared. However, this would introduce concerns about
     hashing costs and collision handling. Moreover, if the goal is storage-size optimization, there would also
     be additional complexity around deduplication (e.g. whether JSON documents differing only in whitespace,

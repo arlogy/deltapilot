@@ -7,7 +7,7 @@ import (
 
 /*
 TransitionSnapshot represents a resource transition from a baseline state to a target state.
-When present, the baseline state establishes a reference for comparing the target state.
+The baseline state establishes a reference for comparing the target state.
 
 The following relational schema is provided for clarity.
 
