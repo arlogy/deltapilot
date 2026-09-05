@@ -258,9 +258,13 @@ func applySnapshotTransitionForID[T any](
 		}
 	}
 
+	if result.RowsAffected == 0 {
+		return storage.WrapSnapshotNotFoundByID(id)
+	}
+
 	// defensive check: this should never occur, as a snapshot is uniquely identified by an ID
 	if result.RowsAffected != 1 {
-		storage.WrapStorageWriteError(
+		return storage.WrapStorageWriteError(
 			"expected exactly 1 snapshot to be updated for ID %q; updated %d",
 			id,
 			result.RowsAffected,
@@ -298,9 +302,13 @@ func applySnapshotTransitionForScopeAndResourceAndVariant[T any](
 		}
 	}
 
+	if result.RowsAffected == 0 {
+		return storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(&scopeID, resourceID, &variantID)
+	}
+
 	// defensive check: this should never occur, as a snapshot is uniquely identified by the identifiers
 	if result.RowsAffected != 1 {
-		storage.WrapStorageWriteError(
+		return storage.WrapStorageWriteError(
 			"expected exactly 1 snapshot to be updated for scope ID %q, resource ID %q, variant ID %q;"+
 				" updated %d",
 			scopeID,

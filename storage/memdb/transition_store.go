@@ -35,11 +35,10 @@ func (s *TransitionStore) AddSnapshot(snapshot *revision.TransitionSnapshot) err
 		return storage.WrapSnapshotDuplicateID(id)
 	}
 
+	// we call hasScopeAndResourceAndVariant() instead of MapsScopeAndResourceAndVariant() to avoid a
+	// deadlock, since s.mu is already write-locked
 	scopeID, resourceID, variantID := snapshot.ScopeID, snapshot.ResourceID, snapshot.VariantID
-	snapshotExists, err := s.MapsScopeAndResourceAndVariant(scopeID, resourceID, variantID)
-	if err != nil {
-		return err
-	}
+	snapshotExists := s.hasScopeAndResourceAndVariant(scopeID, resourceID, variantID)
 	if snapshotExists {
 		return storage.WrapSnapshotDuplicateScopeAndResourceAndVariant(scopeID, resourceID, variantID)
 	}
@@ -83,15 +82,7 @@ func (s *TransitionStore) GetByScopeAndResourceAndVariant(
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	for _, snapshot := range s.snapshots {
-		if snapshot.ScopeID == scopeID &&
-			snapshot.ResourceID == resourceID &&
-			snapshot.VariantID == variantID {
-			return snapshot.Clone(), nil
-		}
-	}
-
-	return nil, storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(&scopeID, resourceID, &variantID)
+	return s.findByScopeAndResourceAndVariant(scopeID, resourceID, variantID, true)
 }
 
 func (s *TransitionStore) MapsID(id string) (bool, error) {
@@ -126,15 +117,7 @@ func (s *TransitionStore) MapsScopeAndResourceAndVariant(
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	for _, snapshot := range s.snapshots {
-		if snapshot.ScopeID == scopeID &&
-			snapshot.ResourceID == resourceID &&
-			snapshot.VariantID == variantID {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return s.hasScopeAndResourceAndVariant(scopeID, resourceID, variantID), nil
 }
 
 func (s *TransitionStore) ApplyTransitionForID(id string, targetData []byte) error {
@@ -162,7 +145,9 @@ func (s *TransitionStore) ApplyTransitionForScopeAndResourceAndVariant(
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	snapshot, err := s.GetByScopeAndResourceAndVariant(scopeID, resourceID, variantID)
+	// we call findByScopeAndResourceAndVariant() instead of GetByScopeAndResourceAndVariant() to avoid a
+	// deadlock, since s.mu is already write-locked
+	snapshot, err := s.findByScopeAndResourceAndVariant(scopeID, resourceID, variantID, false)
 	if err != nil {
 		return err
 	}
@@ -220,4 +205,40 @@ func (s *TransitionStore) DeleteByScopeAndResourceAndVariant(
 	}
 
 	return deleted, nil
+}
+
+func (s *TransitionStore) findByScopeAndResourceAndVariant(
+	scopeID string,
+	resourceID string,
+	variantID string,
+	cloneMatch bool,
+) (*revision.TransitionSnapshot, error) {
+	for _, snapshot := range s.snapshots {
+		if snapshot.ScopeID == scopeID &&
+			snapshot.ResourceID == resourceID &&
+			snapshot.VariantID == variantID {
+			if cloneMatch {
+				return snapshot.Clone(), nil
+			}
+			return snapshot, nil
+		}
+	}
+
+	return nil, storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(&scopeID, resourceID, &variantID)
+}
+
+func (s *TransitionStore) hasScopeAndResourceAndVariant(
+	scopeID string,
+	resourceID string,
+	variantID string,
+) bool {
+	for _, snapshot := range s.snapshots {
+		if snapshot.ScopeID == scopeID &&
+			snapshot.ResourceID == resourceID &&
+			snapshot.VariantID == variantID {
+			return true
+		}
+	}
+
+	return false
 }
