@@ -7,30 +7,47 @@ import (
 
 	"github.com/arlogy/deltapilot/internal/dbclient"
 	"github.com/arlogy/deltapilot/internal/failures"
+	"github.com/arlogy/deltapilot/storage"
 )
 
-type storeAddDelete[T any] interface {
-	AddSnapshot(snapshot *T) error
-	storeDeleteOnly
+// Note: TStore is assumed to be substituted with an interface type rather than a struct type, so we always
+//       use TStore instead of *TStore for both function parameters and return types.
+
+type storeFixtureData[TStore any] struct {
+	recordedIDs []string // IDs of snapshots added to the fixture stores
+
+	withStore0 func(fn func(store TStore))
+	withStore1 func(fn func(store TStore))
+	withStoreN func(fn func(store TStore))
 }
 
-type storeDeleteOnly interface {
+type storeOpAdd[TSnapshot any] interface {
+	AddSnapshot(snapshot *TSnapshot) error
+}
+
+type storeOpGetByID[TSnapshot any] interface {
+	GetByID(id string) (*TSnapshot, error)
+}
+
+type storeOpDelete interface {
 	DeleteByID(id string) (int64, error)
 }
 
-type storeFixtureData[T any] struct {
-	pAttrsID1 string // ID generated for a snapshot that preserves all supplied attributes
-	pAttrsID2 string // ID generated for a snapshot that preserves all supplied attributes
-
-	withStore0 func(fn func(store T))
-	withStore1 func(fn func(store T))
-	withStoreN func(fn func(store T))
-}
-
-func CheckStoreEmpty[T any](t *testing.T, handle *dbclient.DBHandle) {
+func AddSnapshotsToStore[TSnapshot any](t *testing.T, store storeOpAdd[TSnapshot], snapshots []*TSnapshot) {
 	t.Helper()
 
-	var snapshot T
+	for i, snapshot := range snapshots {
+		err := store.AddSnapshot(snapshot)
+		if err != nil {
+			t.Fatalf("failed to add snapshot at index %d to store: %v", i, failures.AsErrorWithSemantics(err))
+		}
+	}
+}
+
+func CheckStoreEmpty[TSnapshot any](t *testing.T, handle *dbclient.DBHandle) {
+	t.Helper()
+
+	var snapshot TSnapshot
 	var count int64
 
 	err := handle.DB.Model(&snapshot).Count(&count).Error
@@ -64,7 +81,50 @@ func CheckStoreOutputError(t *testing.T, gotErr error, wrappedErr error, returne
 	}
 }
 
-func CleanupStore(t *testing.T, store storeDeleteOnly, snapshotIDs []string) {
+func CheckStoreStateSharing[
+	TStore interface {
+		storeOpAdd[TSnapshot]
+		storeOpDelete
+		storeOpGetByID[TSnapshot]
+	},
+	TSnapshot any,
+](
+	t *testing.T,
+	newStore func(t *testing.T) TStore,
+	newSnapshot func(t *testing.T) (string, *TSnapshot),
+	stateSharable bool,
+) {
+	t.Helper()
+
+	emptyStore := newStore(t)
+
+	id, baseSnapshot := newSnapshot(t)
+
+	gotSnapshot, gotErr := emptyStore.GetByID(id)
+	AssertEqual(t, gotSnapshot == nil, true).Critical()
+	AssertErrorIs(t, gotErr, storage.ErrSnapshotRetrieval).Critical()
+	AssertEqual(t, gotErr.Error(), storage.WrapSnapshotNotFoundByID(id).Error()).Critical()
+
+	seededStore := newStore(t)
+	errAdd := seededStore.AddSnapshot(baseSnapshot)
+	defer CleanupStore(t, seededStore, []string{id})
+
+	AssertErrorIs(t, errAdd, nil).Critical()
+
+	gotSnapshot, gotErr = emptyStore.GetByID(id)
+	if stateSharable {
+		// note: because tests run against a single storage backend (e.g. a database), stateSharable being
+		//       true is equivalent to the state being shared among stores
+		AssertEqual(t, gotSnapshot != nil, true).Critical()
+		AssertErrorIs(t, gotErr, nil).Critical()
+	} else {
+		AssertEqual(t, gotSnapshot == nil, true).Critical()
+		AssertErrorIs(t, gotErr, storage.ErrSnapshotRetrieval).Critical()
+		AssertEqual(t, gotErr.Error(), storage.WrapSnapshotNotFoundByID(id).Error()).Critical()
+	}
+}
+
+func CleanupStore(t *testing.T, store storeOpDelete, snapshotIDs []string) {
 	for i, id := range snapshotIDs {
 		_, err := store.DeleteByID(id)
 		if err != nil {
@@ -83,22 +143,63 @@ func CleanupStore(t *testing.T, store storeDeleteOnly, snapshotIDs []string) {
 	}
 }
 
-// NewStoreFixture creates a store fixture.
-//
-// Note that TStore is assumed to be substituted with an interface type rather than a struct type, so we
-// always use TStore instead of *TStore for both function parameters and return types.
-func NewStoreFixture[TSnapshot any, TStore storeAddDelete[TSnapshot]](
+func GenerateSnapshots[TSnapshot any](
+	t *testing.T,
+	newSnapshot1 func(t *testing.T) *TSnapshot,
+	newSnapshot2 func(t *testing.T) *TSnapshot,
+	includeNil bool,
+	count int,
+) []*TSnapshot {
+	t.Helper()
+
+	snapshots := make([]*TSnapshot, count)
+	if includeNil {
+		for i := range count {
+			// arbitrary variation pattern; callers should rely on generated contents only
+			switch i % 3 {
+			case 0:
+				snapshots[i] = nil
+			case 1:
+				snapshots[i] = newSnapshot1(t)
+			default:
+				snapshots[i] = newSnapshot2(t)
+			}
+		}
+	} else {
+		for i := range count {
+			// arbitrary variation pattern; callers should rely on generated contents only
+			switch i % 2 {
+			case 0:
+				snapshots[i] = newSnapshot1(t)
+			default:
+				snapshots[i] = newSnapshot2(t)
+			}
+		}
+	}
+
+	return snapshots
+}
+
+func NewStoreFixture[
+	TStore interface {
+		storeOpAdd[TSnapshot]
+		storeOpDelete
+	},
+	TSnapshot any,
+](
 	t *testing.T,
 	newStore func(t *testing.T) TStore,
-	newSnapshot func(t *testing.T, preserveAttributes bool) (string, *TSnapshot),
+	newSnapshots func(t *testing.T) ([]string, []*TSnapshot),
 ) storeFixtureData[TStore] {
-	preservedAttrsID1, snapshot1 := newSnapshot(t, true)
-	preservedAttrsID2, snapshot2 := newSnapshot(t, true)
-	generatedAttrsID_, snapshot3 := newSnapshot(t, false)
+	t.Helper()
+
+	ids, snapshots := newSnapshots(t)
+
+	AssertEqual(t, len(snapshots) >= 3, true).Critical()
+	AssertEqual(t, len(snapshots), len(ids)).Critical()
 
 	return storeFixtureData[TStore]{
-		pAttrsID1: preservedAttrsID1,
-		pAttrsID2: preservedAttrsID2,
+		recordedIDs: ids,
 
 		// store0, store1 and storeN are created within their respective callbacks and cleaned up when the
 		// callbacks return, so that the stores remain independent and do not affect one another. Indeed, as
@@ -112,7 +213,7 @@ func NewStoreFixture[TSnapshot any, TStore storeAddDelete[TSnapshot]](
 
 		withStore1: func(fn func(store TStore)) {
 			store1 := newStore(t) // store with one snapshot
-			for i, snapshot := range []*TSnapshot{snapshot1} {
+			for i, snapshot := range []*TSnapshot{snapshots[0]} {
 				err := store1.AddSnapshot(snapshot)
 				if err != nil {
 					t.Fatalf(
@@ -122,13 +223,13 @@ func NewStoreFixture[TSnapshot any, TStore storeAddDelete[TSnapshot]](
 					)
 				}
 			}
-			defer CleanupStore(t, store1, []string{preservedAttrsID1})
+			defer CleanupStore(t, store1, []string{ids[0]})
 			fn(store1)
 		},
 
 		withStoreN: func(fn func(store TStore)) {
 			storeN := newStore(t) // store with several snapshots
-			for i, snapshot := range []*TSnapshot{snapshot1, snapshot2, snapshot3} {
+			for i, snapshot := range snapshots {
 				err := storeN.AddSnapshot(snapshot)
 				if err != nil {
 					t.Fatalf(
@@ -138,7 +239,7 @@ func NewStoreFixture[TSnapshot any, TStore storeAddDelete[TSnapshot]](
 					)
 				}
 			}
-			defer CleanupStore(t, storeN, []string{preservedAttrsID1, preservedAttrsID2, generatedAttrsID_})
+			defer CleanupStore(t, storeN, ids)
 			fn(storeN)
 		},
 	}
