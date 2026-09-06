@@ -239,7 +239,15 @@ func TestChronicleStoreAddSnapshot(
 					t, errAdd, errGet, refSnapshot, addedSnapshot, gotSnapshot, timeOpts,
 					preserveTimeLocation,
 				)
-				assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+				assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
+
+				assertRetrievedChronicleSnapshotIndependent(
+					t, addedSnapshot, nil, func(t *testing.T) *revision.ChronicleSnapshot {
+						snapshot, err := store.GetByID(id)
+						AssertErrorIs(t, err, nil).Critical()
+						return snapshot
+					},
+				)
 
 				// detect newly added fields so they can be accounted for in tests when necessary
 				AssertFieldNamesEqual(t, gotSnapshot, []string{
@@ -380,7 +388,12 @@ func TestChronicleStoreGetByID(
 					t, errAdd, errGet, refSnapshot, addedSnapshot, gotSnapshot, timeOpts,
 					preserveTimeLocation,
 				)
-				assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+				assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
+
+				gotSnapshot2, errGet2 := store.GetByID(id)
+				AssertErrorIs(t, errGet2, nil).Critical()
+				AssertEqual(t, gotSnapshot2, gotSnapshot).Critical()
+				assertRetrievedChronicleSnapshotIndependent(t, gotSnapshot, gotSnapshot2, nil)
 
 				// detect newly added fields so they can be accounted for in tests when necessary
 				AssertFieldNamesEqual(t, gotSnapshot, []string{
@@ -561,12 +574,21 @@ func TestChronicleStoreGetByScopeID(
 					assertAddedChronicleSnapshotPreserved(
 						t, nil, nil, refSnapshot, addedSnapshot, gotSnapshot, timeOpts, preserveTimeLocation,
 					)
-					assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+					assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
 
 					// detect newly added fields so they can be accounted for in tests when necessary
 					AssertFieldNamesEqual(t, gotSnapshot, []string{
 						"ID", "ScopeID", "ResourceID", "VariantID", "Data", "CreatedAt",
 					}).Critical()
+				}
+
+				gotSnapshots2, errGet2 := store.GetByScopeID(scopeID)
+				gotSorted2 := sortSnapshots(gotSnapshots2)
+
+				AssertErrorIs(t, errGet2, nil).Critical()
+				AssertEqual(t, gotSorted2, gotSorted).Critical()
+				for i, gotSnapshot := range gotSorted {
+					assertRetrievedChronicleSnapshotIndependent(t, gotSnapshot, gotSorted2[i], nil)
 				}
 			}
 		}
@@ -837,12 +859,21 @@ func TestChronicleStoreGetByScopeAndResourceAndVariant(
 					assertAddedChronicleSnapshotPreserved(
 						t, nil, nil, refSnapshot, addedSnapshot, gotSnapshot, timeOpts, preserveTimeLocation,
 					)
-					assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+					assertRetrievedChronicleSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
 
 					// detect newly added fields so they can be accounted for in tests when necessary
 					AssertFieldNamesEqual(t, gotSnapshot, []string{
 						"ID", "ScopeID", "ResourceID", "VariantID", "Data", "CreatedAt",
 					}).Critical()
+				}
+
+				gotSnapshots2, errGet2 := store.GetByScopeAndResourceAndVariant(scopeID, resourceID, variantID)
+				gotSorted2 := sortSnapshots(gotSnapshots2)
+
+				AssertErrorIs(t, errGet2, nil).Critical()
+				AssertEqual(t, gotSorted2, gotSorted).Critical()
+				for i, gotSnapshot := range gotSorted {
+					assertRetrievedChronicleSnapshotIndependent(t, gotSnapshot, gotSorted2[i], nil)
 				}
 			}
 		}
@@ -1657,6 +1688,7 @@ func assertRetrievedChronicleSnapshotIndependent(
 	t *testing.T,
 	addedSnapshot *revision.ChronicleSnapshot,
 	gotSnapshot *revision.ChronicleSnapshot,
+	fetchSnapshot func(t *testing.T) *revision.ChronicleSnapshot,
 ) {
 	t.Helper()
 
@@ -1685,6 +1717,10 @@ func assertRetrievedChronicleSnapshotIndependent(
 	addedSnapshot.CreatedAt = time.Now()
 
 	// verify that changes to addedSnapshot are not reflected in gotSnapshot
+
+	if fetchSnapshot != nil { // intended for setting gotSnapshot after mutating addedSnapshot
+		gotSnapshot = fetchSnapshot(t)
+	}
 
 	AssertNotEqual(t, addedSnapshot.ID, gotSnapshot.ID).Critical()
 	AssertNotEqual(t, addedSnapshot.ScopeID, gotSnapshot.ScopeID).Critical()

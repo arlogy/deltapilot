@@ -23,7 +23,7 @@ func (s *TransitionStore) CanShareState() bool {
 func (s *TransitionStore) AddSnapshot(snapshot *revision.TransitionSnapshot) error {
 	return createSnapshot(
 		s.handle,
-		snapshot,
+		newTransitionRow(snapshot),
 		func(duplicates bool) error {
 			switch duplicates {
 			case true:
@@ -85,7 +85,7 @@ func (s *TransitionStore) MapsScopeAndResourceAndVariant(
 func (s *TransitionStore) ApplyTransitionForID(id string, targetData []byte) error {
 	plan := revision.PlanTransitionTo(targetData)
 
-	return applySnapshotTransitionForID[revision.TransitionSnapshot](s.handle, id, &plan)
+	return applySnapshotTransitionForID[transitionRow](s.handle, id, &plan)
 }
 
 func (s *TransitionStore) ApplyTransitionForScopeAndResourceAndVariant(
@@ -96,7 +96,7 @@ func (s *TransitionStore) ApplyTransitionForScopeAndResourceAndVariant(
 ) error {
 	plan := revision.PlanTransitionTo(targetData)
 
-	return applySnapshotTransitionForScopeAndResourceAndVariant[revision.TransitionSnapshot](
+	return applySnapshotTransitionForScopeAndResourceAndVariant[transitionRow](
 		s.handle, scopeID, resourceID, variantID, &plan,
 	)
 }

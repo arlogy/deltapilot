@@ -6,15 +6,17 @@ import (
 	"github.com/arlogy/deltapilot/revision"
 )
 
-// chronicleRow contains metadata used to customize GORM behavior for certain database operations on
-// revision.ChronicleSnapshot.
+// chronicleRow contains GORM tags for controlling GORM's automatic behavior.
+//   - We use it only for certain database write operations on revision.ChronicleSnapshot.
+//   - We do not test its effects in our test suite, as this behavior is specific to GORM and testing it would
+//     require distinguishing between zero non-zero time.Time values.
 type chronicleRow struct {
 	ID         string
 	ScopeID    *string
 	ResourceID string
 	VariantID  *string
 	Data       []byte
-	CreatedAt  time.Time `gorm:"not null;autoCreateTime:false"`
+	CreatedAt  time.Time `gorm:"autoCreateTime:false"`
 }
 
 func newChronicleRow(snapshot *revision.ChronicleSnapshot) *chronicleRow {

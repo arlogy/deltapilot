@@ -15,10 +15,10 @@ var (
 func InitDB(t *testing.T) *dbclient.DBHandle {
 	t.Helper()
 
-	if testDBHandle == nil {
-		testDBMu.Lock()
-		defer testDBMu.Unlock()
+	testDBMu.Lock()
+	defer testDBMu.Unlock()
 
+	if testDBHandle == nil {
 		handle, err := dbclient.ConnectFromEnv()
 		if err != nil {
 			t.Fatal(err)

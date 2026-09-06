@@ -303,7 +303,15 @@ func TestTransitionStoreAddSnapshot(
 					t, errAdd, errGet, refSnapshot, addedSnapshot, gotSnapshot, timeOpts,
 					preserveTimeLocation,
 				)
-				assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+				assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
+
+				assertRetrievedTransitionSnapshotIndependent(
+					t, addedSnapshot, nil, func(t *testing.T) *revision.TransitionSnapshot {
+						snapshot, err := store.GetByID(id)
+						AssertErrorIs(t, err, nil).Critical()
+						return snapshot
+					},
+				)
 
 				// detect newly added fields so they can be accounted for in tests when necessary
 				AssertFieldNamesEqual(t, gotSnapshot, []string{
@@ -445,7 +453,12 @@ func TestTransitionStoreGetByID(
 					t, errAdd, errGet, refSnapshot, addedSnapshot, gotSnapshot, timeOpts,
 					preserveTimeLocation,
 				)
-				assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+				assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
+
+				gotSnapshot2, errGet2 := store.GetByID(id)
+				AssertErrorIs(t, errGet2, nil).Critical()
+				AssertEqual(t, gotSnapshot2, gotSnapshot).Critical()
+				assertRetrievedTransitionSnapshotIndependent(t, gotSnapshot, gotSnapshot2, nil)
 
 				// detect newly added fields so they can be accounted for in tests when necessary
 				AssertFieldNamesEqual(t, gotSnapshot, []string{
@@ -631,13 +644,22 @@ func TestTransitionStoreGetByScopeID(
 					assertAddedTransitionSnapshotPreserved(
 						t, nil, nil, refSnapshot, addedSnapshot, gotSnapshot, timeOpts, preserveTimeLocation,
 					)
-					assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+					assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
 
 					// detect newly added fields so they can be accounted for in tests when necessary
 					AssertFieldNamesEqual(t, gotSnapshot, []string{
 						"ID", "ScopeID", "ResourceID", "VariantID", "BaselineData", "TargetData", "CreatedAt",
 						"UpdatedAt",
 					}).Critical()
+				}
+
+				gotSnapshots2, errGet2 := store.GetByScopeID(scopeID)
+				gotSorted2 := sortSnapshots(gotSnapshots2)
+
+				AssertErrorIs(t, errGet2, nil).Critical()
+				AssertEqual(t, gotSorted2, gotSorted).Critical()
+				for i, gotSnapshot := range gotSorted {
+					assertRetrievedTransitionSnapshotIndependent(t, gotSnapshot, gotSorted2[i], nil)
 				}
 			}
 		}
@@ -920,7 +942,12 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 				assertAddedTransitionSnapshotPreserved(
 					t, nil, nil, refSnapshot, addedSnapshot, gotSnapshot, timeOpts, preserveTimeLocation,
 				)
-				assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot)
+				assertRetrievedTransitionSnapshotIndependent(t, addedSnapshot, gotSnapshot, nil)
+
+				gotSnapshot2, errGet2 := store.GetByScopeAndResourceAndVariant(scopeID, resourceID, variantID)
+				AssertErrorIs(t, errGet2, nil).Critical()
+				AssertEqual(t, gotSnapshot2, gotSnapshot).Critical()
+				assertRetrievedTransitionSnapshotIndependent(t, gotSnapshot, gotSnapshot2, nil)
 
 				// detect newly added fields so they can be accounted for in tests when necessary
 				AssertFieldNamesEqual(t, gotSnapshot, []string{
@@ -2141,6 +2168,7 @@ func assertRetrievedTransitionSnapshotIndependent(
 	t *testing.T,
 	addedSnapshot *revision.TransitionSnapshot,
 	gotSnapshot *revision.TransitionSnapshot,
+	fetchSnapshot func(t *testing.T) *revision.TransitionSnapshot,
 ) {
 	t.Helper()
 
@@ -2168,6 +2196,10 @@ func assertRetrievedTransitionSnapshotIndependent(
 	addedSnapshot.UpdatedAt = time.Now()
 
 	// verify that changes to addedSnapshot are not reflected in gotSnapshot
+
+	if fetchSnapshot != nil { // intended for setting gotSnapshot after mutating addedSnapshot
+		gotSnapshot = fetchSnapshot(t)
+	}
 
 	AssertNotEqual(t, addedSnapshot.ID, gotSnapshot.ID).Critical()
 	AssertNotEqual(t, addedSnapshot.ScopeID, gotSnapshot.ScopeID).Critical()
