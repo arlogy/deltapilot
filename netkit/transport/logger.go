@@ -9,7 +9,7 @@ type NetLogger interface {
 	LogError(format string, v ...any)
 }
 
-func NewNetLogger() NetLogger {
+func NewDefaultNetLogger() NetLogger {
 	return &defaultLogger{}
 }
 

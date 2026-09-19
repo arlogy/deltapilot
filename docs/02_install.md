@@ -55,11 +55,13 @@ depend on other packages used internally by their APIs or test code.
 
 ### netkit
 
-netkit provides a convenient client-server architecture built around the Go [net](https://pkg.go.dev/net)
+netkit provides a flexible client-server architecture built around the Go [net](https://pkg.go.dev/net)
 package.
 - `netkit/transport` exposes the communication API.
 - `netkit/cli` exposes an API for CLI integration.
 
 When running a CLI application powered by netkit, please keep the following in mind.
-- `-nettype`: see [net.Listen](https://pkg.go.dev/net#Listen) for supported network types and their semantics.
-- `-netaddr`: see [net.Dial](https://pkg.go.dev/net#Dial) for address syntax and semantics.
+- Server: for `-nettype` and `-netaddr`, see [net.Listen](https://pkg.go.dev/net#Listen) for supported
+network types, address syntax, and their semantics.
+- Client: for `-nettype` and `-netaddr`, see [net.Dial](https://pkg.go.dev/net#Dial) for supported network
+types, address syntax, and their semantics.

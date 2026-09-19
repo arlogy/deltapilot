@@ -20,7 +20,7 @@ func main() {
 	defaultMaxMsgs := 64
 	defaultTimeout := 30 * time.Second
 
-	logger := transport.NewNetLogger()
+	logger := transport.NewDefaultNetLogger()
 
 	cli.RunApp(
 		defaultNet,
