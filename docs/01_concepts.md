@@ -22,11 +22,11 @@ the following scenarios.
     unchanged. However, allowing the target state to be updated over time is more suitable when the final
     target state may not be fully known at snapshot creation time, such as when repairs are made to a system
     incrementally and its new state is recorded after each step. In this case, the review workflow would
-    actually evaluate whether the final target state is appropriate, ensuring that the repairs are effective
-    given the baseline condition.
-    - Note: in both cases, when the baseline state is `nil`, the target state may represent a new state
-    proposed for review against an external reference state, such as a state maintained centrally in a
-    database.
+    actually be evaluating whether the final target state is appropriate, ensuring that the repairs are
+    effective given the baseline condition.
+    - Note: in both cases, when the baseline state is `nil`, the target state may represent the state of a
+    newly created resource, or, for an existing resource, a proposed new state to be reviewed against an
+    external reference state maintained centrally, such as in a database.
 
 ## Snapshot storage
 

@@ -38,9 +38,9 @@ parameters to be configured.*
 ### Run from source
 
 - `cd <path_to_project>`
-- `go run ./cmd/netapp` outputs usage.
 - `go run ./cmd/netapp server` starts a server.
 - `go run ./cmd/netapp client` starts a client.
+- `go run ./cmd/netapp <other>` outputs usage.
 
 ### Run from build
 

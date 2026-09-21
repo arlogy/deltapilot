@@ -6,6 +6,7 @@ import (
 	"syscall"
 )
 
+// RegisterShutdownHandler registers a handler for shutdown signals using RegisterSignalHandler().
 func RegisterShutdownHandler(onShutdown func()) context.Context {
 	return RegisterSignalHandler(
 		onShutdown,
