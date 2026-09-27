@@ -9,6 +9,11 @@ import (
 	"github.com/arlogy/deltapilot/internal/random"
 )
 
+func GenerateAlphanumeric(t *testing.T) string {
+	t.Helper()
+	return random.NewAlphanumeric(random.UniqueStrLen)
+}
+
 func GenerateBytes(t *testing.T) []byte {
 	t.Helper()
 	return []byte(GenerateID(t))
