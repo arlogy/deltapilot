@@ -158,7 +158,7 @@ func TestTransitionStoreAddSnapshot(
 				for range ScenarioRepeatCount {
 					err := store.AddSnapshot(nil)
 					AssertErrorIs(t, err, storage.ErrSnapshotRequired).Critical()
-					AssertEqual(t, err.Error(), storage.WrapSnapshotRequired().Error()).Critical()
+					AssertErrorMessage(t, err, storage.WrapSnapshotRequired().Error()).Critical()
 				}
 			}
 
@@ -400,9 +400,7 @@ func TestTransitionStoreGetByID(
 				for range ScenarioRepeatCount {
 					got, err := store.GetByID(unknownID)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(), storage.WrapSnapshotNotFoundByID(unknownID).Error(),
-					).Critical()
+					AssertErrorMessage(t, err, storage.WrapSnapshotNotFoundByID(unknownID).Error()).Critical()
 					AssertEqual(t, got == nil, true).Critical()
 				}
 			}
@@ -752,8 +750,8 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 						unknownScopeID, unknownResourceID, unknownVariantID,
 					)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(),
+					AssertErrorMessage(
+						t, err,
 						storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 							&unknownScopeID, unknownResourceID, &unknownVariantID,
 						).Error(),
@@ -766,8 +764,8 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 						unknownScopeID, unknownResourceID, variantID,
 					)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(),
+					AssertErrorMessage(
+						t, err,
 						storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 							&unknownScopeID, unknownResourceID, &variantID,
 						).Error(),
@@ -778,8 +776,8 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 						unknownScopeID, resourceID, unknownVariantID,
 					)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(),
+					AssertErrorMessage(
+						t, err,
 						storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 							&unknownScopeID, resourceID, &unknownVariantID,
 						).Error(),
@@ -790,8 +788,8 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 						scopeID, unknownResourceID, unknownVariantID,
 					)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(),
+					AssertErrorMessage(
+						t, err,
 						storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 							&scopeID, unknownResourceID, &unknownVariantID,
 						).Error(),
@@ -802,8 +800,8 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 
 					got, err = store.GetByScopeAndResourceAndVariant(unknownScopeID, resourceID, variantID)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(),
+					AssertErrorMessage(
+						t, err,
 						storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 							&unknownScopeID, resourceID, &variantID,
 						).Error(),
@@ -812,8 +810,8 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 
 					got, err = store.GetByScopeAndResourceAndVariant(scopeID, unknownResourceID, variantID)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(),
+					AssertErrorMessage(
+						t, err,
 						storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 							&scopeID, unknownResourceID, &variantID,
 						).Error(),
@@ -822,8 +820,8 @@ func TestTransitionStoreGetByScopeAndResourceAndVariant(
 
 					got, err = store.GetByScopeAndResourceAndVariant(scopeID, resourceID, unknownVariantID)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(),
+					AssertErrorMessage(
+						t, err,
 						storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 							&scopeID, resourceID, &unknownVariantID,
 						).Error(),
@@ -1389,7 +1387,7 @@ func TestTransitionApplyTransitionForID(
 					for range ScenarioRepeatCount {
 						err := store.ApplyTransitionForID(unknownID, newTargetData)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(t, err.Error(), storage.WrapSnapshotNotFoundByID(unknownID).Error()).
+						AssertErrorMessage(t, err, storage.WrapSnapshotNotFoundByID(unknownID).Error()).
 							Critical()
 					}
 				}
@@ -1557,8 +1555,8 @@ func TestTransitionApplyTransitionForScopeAndResourceAndVariant(
 							unknownScopeID, unknownResourceID, unknownVariantID, newTargetData,
 						)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(
-							t, err.Error(),
+						AssertErrorMessage(
+							t, err,
 							storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 								&unknownScopeID, unknownResourceID, &unknownVariantID,
 							).Error(),
@@ -1570,8 +1568,8 @@ func TestTransitionApplyTransitionForScopeAndResourceAndVariant(
 							unknownScopeID, unknownResourceID, variantID, newTargetData,
 						)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(
-							t, err.Error(),
+						AssertErrorMessage(
+							t, err,
 							storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 								&unknownScopeID, unknownResourceID, &variantID,
 							).Error(),
@@ -1581,8 +1579,8 @@ func TestTransitionApplyTransitionForScopeAndResourceAndVariant(
 							unknownScopeID, resourceID, unknownVariantID, newTargetData,
 						)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(
-							t, err.Error(),
+						AssertErrorMessage(
+							t, err,
 							storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 								&unknownScopeID, resourceID, &unknownVariantID,
 							).Error(),
@@ -1592,8 +1590,8 @@ func TestTransitionApplyTransitionForScopeAndResourceAndVariant(
 							scopeID, unknownResourceID, unknownVariantID, newTargetData,
 						)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(
-							t, err.Error(),
+						AssertErrorMessage(
+							t, err,
 							storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 								&scopeID, unknownResourceID, &unknownVariantID,
 							).Error(),
@@ -1605,8 +1603,8 @@ func TestTransitionApplyTransitionForScopeAndResourceAndVariant(
 							unknownScopeID, resourceID, variantID, newTargetData,
 						)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(
-							t, err.Error(),
+						AssertErrorMessage(
+							t, err,
 							storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 								&unknownScopeID, resourceID, &variantID,
 							).Error(),
@@ -1616,8 +1614,8 @@ func TestTransitionApplyTransitionForScopeAndResourceAndVariant(
 							scopeID, unknownResourceID, variantID, newTargetData,
 						)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(
-							t, err.Error(),
+						AssertErrorMessage(
+							t, err,
 							storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 								&scopeID, unknownResourceID, &variantID,
 							).Error(),
@@ -1627,8 +1625,8 @@ func TestTransitionApplyTransitionForScopeAndResourceAndVariant(
 							scopeID, resourceID, unknownVariantID, newTargetData,
 						)
 						AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-						AssertEqual(
-							t, err.Error(),
+						AssertErrorMessage(
+							t, err,
 							storage.WrapSnapshotNotFoundByScopeAndResourceAndVariant(
 								&scopeID, resourceID, &unknownVariantID,
 							).Error(),

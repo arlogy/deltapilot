@@ -147,7 +147,7 @@ func TestChronicleStoreAddSnapshot(
 				for range ScenarioRepeatCount {
 					err := store.AddSnapshot(nil)
 					AssertErrorIs(t, err, storage.ErrSnapshotRequired).Critical()
-					AssertEqual(t, err.Error(), storage.WrapSnapshotRequired().Error()).Critical()
+					AssertErrorMessage(t, err, storage.WrapSnapshotRequired().Error()).Critical()
 				}
 			}
 
@@ -336,9 +336,7 @@ func TestChronicleStoreGetByID(
 				for range ScenarioRepeatCount {
 					got, err := store.GetByID(unknownID)
 					AssertErrorIs(t, err, storage.ErrSnapshotRetrieval).Critical()
-					AssertEqual(
-						t, err.Error(), storage.WrapSnapshotNotFoundByID(unknownID).Error(),
-					).Critical()
+					AssertErrorMessage(t, err, storage.WrapSnapshotNotFoundByID(unknownID).Error()).Critical()
 					AssertEqual(t, got == nil, true).Critical()
 				}
 			}

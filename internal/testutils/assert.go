@@ -64,6 +64,17 @@ func AssertErrorIs(t *testing.T, got error, want error) AssertionResult {
 	return assertionPassed(t)
 }
 
+func AssertErrorMessage(t *testing.T, got error, wantMsg string) AssertionResult {
+	t.Helper()
+
+	if got == nil {
+		t.Error("got nil error, want non-nil error")
+		return assertionFailed(t)
+	}
+
+	return AssertEqual(t, got.Error(), wantMsg)
+}
+
 func AssertFieldNamesEqual(t *testing.T, data any, wantNames []string) AssertionResult {
 	t.Helper()
 

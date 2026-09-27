@@ -103,7 +103,7 @@ func CheckStoreStateSharing[
 	gotSnapshot, gotErr := emptyStore.GetByID(id)
 	AssertEqual(t, gotSnapshot == nil, true).Critical()
 	AssertErrorIs(t, gotErr, storage.ErrSnapshotRetrieval).Critical()
-	AssertEqual(t, gotErr.Error(), storage.WrapSnapshotNotFoundByID(id).Error()).Critical()
+	AssertErrorMessage(t, gotErr, storage.WrapSnapshotNotFoundByID(id).Error()).Critical()
 
 	seededStore := newStore(t)
 	errAdd := seededStore.AddSnapshot(baseSnapshot)
@@ -120,7 +120,7 @@ func CheckStoreStateSharing[
 	} else {
 		AssertEqual(t, gotSnapshot == nil, true).Critical()
 		AssertErrorIs(t, gotErr, storage.ErrSnapshotRetrieval).Critical()
-		AssertEqual(t, gotErr.Error(), storage.WrapSnapshotNotFoundByID(id).Error()).Critical()
+		AssertErrorMessage(t, gotErr, storage.WrapSnapshotNotFoundByID(id).Error()).Critical()
 	}
 }
 
