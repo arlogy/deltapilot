@@ -12,6 +12,8 @@ import (
 	"github.com/arlogy/deltapilot/internal/process"
 )
 
+const MaxSupportedMsgBytes = 1024 * 1024 * 1024 // 1 GiB
+
 const MessageEndByte = process.EndOfTransmission
 
 // ReadFromConnection reads a message from a connection and handles the following scenarios.
@@ -22,6 +24,19 @@ const MessageEndByte = process.EndOfTransmission
 //   - ConcurrentFlooding: enough concurrent read operations are performed to saturate application memory.
 //   - This can be prevented by limiting concurrent calls based on a desired memory limit.
 func ReadFromConnection(conn net.Conn, maxMsgBytes int, readTimeout time.Duration) ([]byte, error) {
+	if maxMsgBytes < 0 {
+		return nil, errors.New("max bytes per message must be non-negative")
+	}
+
+	// keep maxMsgBytes within a reasonably large range that is safe on both 32-bit and 64-bit systems
+	if maxMsgBytes > MaxSupportedMsgBytes {
+		return nil, fmt.Errorf("max bytes per message must be lower than %d", MaxSupportedMsgBytes)
+	}
+
+	if readTimeout < 0 {
+		return nil, fmt.Errorf("read timeout must be non-negative")
+	}
+
 	// set a read deadline to limit BlockingRead to readTimeout
 	conn.SetReadDeadline(time.Now().Add(readTimeout))
 
