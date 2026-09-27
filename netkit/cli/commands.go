@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/arlogy/deltapilot/internal/process"
 	"github.com/arlogy/deltapilot/netkit/transport"
 )
 
@@ -50,7 +51,7 @@ func runClient(
 	defaultAddr string,
 	defaultTimeout time.Duration,
 	logger transport.NetLogger,
-	onAck func(msgData []byte, logger transport.NetLogger),
+	onAck func(ackData []byte, logger transport.NetLogger),
 ) {
 	subFlags := flag.NewFlagSet(subCommand, flag.ExitOnError)
 	nettype := subFlags.String("nettype", defaultNet, "network type (tcp, tcp4, tcp6, unix or unixpacket)")
@@ -70,5 +71,5 @@ func runClient(
 		os.Exit(2) // same exit status as subFlags.Parse() above
 	}
 
-	transport.StartClient(*nettype, *netaddr, *ackTimeout, logger, onAck)
+	transport.StartClient(*nettype, *netaddr, *ackTimeout, logger, process.ReadFromStdin, onAck)
 }

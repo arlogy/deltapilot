@@ -102,17 +102,17 @@ func validateServerConfig(
 	)
 
 	if maxMsgBytes <= 0 {
-		logger.LogError("max bytes per message must be positive")
+		logger.LogError("max bytes per message must be greater than zero")
 		return false
 	}
 
 	if maxConcurrentMsgs <= 0 {
-		logger.LogError("max concurrent messages must be positive")
+		logger.LogError("max concurrent messages must be greater than zero")
 		return false
 	}
 
 	if readTimeout <= 0 {
-		logger.LogError("read timeout must be positive")
+		logger.LogError("read timeout must be greater than zero")
 		return false
 	}
 

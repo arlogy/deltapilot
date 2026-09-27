@@ -15,17 +15,18 @@ func StartClient(
 	address string,
 	ackTimeout time.Duration,
 	logger NetLogger,
-	onAck func(msgData []byte, logger NetLogger),
+	readClientMessage func() ([]byte, error),
+	onAck func(ackData []byte, logger NetLogger),
 ) {
 	// validate configuration values
 	if !validateClientConfig(ackTimeout, logger) {
 		return
 	}
 
-	// read message from standard input
-	msgData, err := process.ReadFromStdin()
+	// read client message
+	msgData, err := readClientMessage()
 	if err != nil {
-		logger.LogError("failed to read message from standard input: %v", err)
+		logger.LogError("failed to read client message: %v", err)
 		return
 	}
 
@@ -65,7 +66,7 @@ func validateClientConfig(ackTimeout time.Duration, logger NetLogger) bool {
 	logger.LogInfo("configuration: acknowledgement timeout (%s)", ackTimeout)
 
 	if ackTimeout <= 0 {
-		logger.LogError("acknowledgement timeout must be positive")
+		logger.LogError("acknowledgement timeout must be greater than zero")
 		return false
 	}
 

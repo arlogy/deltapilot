@@ -46,6 +46,7 @@ func ReadFromConnection(conn net.Conn, maxMsgBytes int, readTimeout time.Duratio
 	return bufData, nil
 }
 
+// WriteToConnection writes data to conn, followed by MessageEndByte.
 func WriteToConnection(conn net.Conn, data []byte) error {
 	if _, err := conn.Write(data); err != nil {
 		return err

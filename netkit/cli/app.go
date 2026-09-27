@@ -16,7 +16,7 @@ func RunApp(
 	defaultTimeout time.Duration,
 	logger transport.NetLogger,
 	messageReceivedHandler func(msgData []byte, logger transport.NetLogger),
-	ackReceivedHandler func(msgData []byte, logger transport.NetLogger),
+	ackReceivedHandler func(ackData []byte, logger transport.NetLogger),
 ) {
 	subCommand := ""
 	if len(os.Args) > 1 {

@@ -20,11 +20,11 @@ func NewDBHandle(db *gorm.DB) *DBHandle {
 
 func (h *DBHandle) ConfigureDBPool(maxOpenConns int, maxIdleConns int) error {
 	if maxOpenConns <= 0 {
-		return errors.New("maxOpenConns must be positive")
+		return errors.New("maxOpenConns must be greater than zero")
 	}
 
 	if maxIdleConns <= 0 {
-		return errors.New("maxIdleConns must be positive")
+		return errors.New("maxIdleConns must be greater than zero")
 	}
 
 	if maxIdleConns > maxOpenConns {
