@@ -5,8 +5,7 @@ import "math/rand/v2"
 const asciiChars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 const asciiLen = len(asciiChars)
 
-const UniqueStrLen = 20 // long enough for random string generation while avoiding duplicates
-
+// NewAlphanumeric generates a random string containing only ASCII letters and digits.
 func NewAlphanumeric(length int) string {
 	b := make([]byte, length)
 	for i := range b {

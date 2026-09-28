@@ -20,12 +20,14 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
+
 			maxBytes := []int{-25}
 			timeouts := []time.Duration{-time.Millisecond, 0, time.Millisecond}
 
 			for _, maxMsgBytes := range maxBytes {
 				for _, readTimeout := range timeouts {
-					clientConn := testutils.ConnectToSocketServer(t, network, address)
 					msgData, err := transport.ReadFromConnection(clientConn, maxMsgBytes, readTimeout)
 					testutils.AssertErrorMessage(t, err, "max bytes per message must be non-negative").
 						Critical()
@@ -35,9 +37,6 @@ func TestReadFromConnection(t *testing.T) {
 
 			for _, maxMsgBytes := range maxBytes {
 				for _, readTimeout := range timeouts {
-					testutils.ConnectToSocketServer(t, network, address)
-
-					serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 					msgData, err := transport.ReadFromConnection(serverConn, maxMsgBytes, readTimeout)
 					testutils.AssertErrorMessage(t, err, "max bytes per message must be non-negative").
 						Critical()
@@ -64,12 +63,14 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
+
 			maxBytes := []int{transport.MaxSupportedMsgBytes + 1}
 			timeouts := []time.Duration{-time.Millisecond, 0, time.Millisecond}
 
 			for _, maxMsgBytes := range maxBytes {
 				for _, readTimeout := range timeouts {
-					clientConn := testutils.ConnectToSocketServer(t, network, address)
 					msgData, err := transport.ReadFromConnection(clientConn, maxMsgBytes, readTimeout)
 					testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 						"max bytes per message must be lower than %d", transport.MaxSupportedMsgBytes,
@@ -80,9 +81,6 @@ func TestReadFromConnection(t *testing.T) {
 
 			for _, maxMsgBytes := range maxBytes {
 				for _, readTimeout := range timeouts {
-					testutils.ConnectToSocketServer(t, network, address)
-
-					serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 					msgData, err := transport.ReadFromConnection(serverConn, maxMsgBytes, readTimeout)
 					testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 						"max bytes per message must be lower than %d", transport.MaxSupportedMsgBytes,
@@ -110,12 +108,14 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
+
 			maxBytes := []int{0, 25}
 			timeouts := []time.Duration{-time.Millisecond}
 
 			for _, maxMsgBytes := range maxBytes {
 				for _, readTimeout := range timeouts {
-					clientConn := testutils.ConnectToSocketServer(t, network, address)
 					msgData, err := transport.ReadFromConnection(clientConn, maxMsgBytes, readTimeout)
 					testutils.AssertErrorMessage(t, err, "read timeout must be non-negative").Critical()
 					testutils.AssertEqual(t, msgData == nil, true).Critical()
@@ -124,9 +124,6 @@ func TestReadFromConnection(t *testing.T) {
 
 			for _, maxMsgBytes := range maxBytes {
 				for _, readTimeout := range timeouts {
-					testutils.ConnectToSocketServer(t, network, address)
-
-					serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 					msgData, err := transport.ReadFromConnection(serverConn, maxMsgBytes, readTimeout)
 					testutils.AssertErrorMessage(t, err, "read timeout must be non-negative").Critical()
 					testutils.AssertEqual(t, msgData == nil, true).Critical()
@@ -152,71 +149,36 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			func() {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte("a"))
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
+
+			inputEntries := []string{"a", "ab", testutils.GenerateAlphanumeric(t), "😀"}
+
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(clientConn, []byte(inputVal))
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
-				msgData, err := transport.ReadFromConnection(serverConn, 0, time.Millisecond)
-				testutils.AssertErrorMessage(
-					t, err, "received message exceeds the allowed 0-byte size limit",
-				).Critical()
+				msgData, err := transport.ReadFromConnection(serverConn, inputLen-1, time.Millisecond)
+				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
+					"received message exceeds the allowed %d-byte size limit", inputLen-1,
+				)).Critical()
 				testutils.AssertEqual(t, msgData == nil, true).Critical()
+			}
 
-				err = transport.WriteToConnection(serverConn, []byte("a"))
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(serverConn, []byte(inputVal))
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				msgData, err = transport.ReadFromConnection(clientConn, 0, time.Millisecond)
-				testutils.AssertErrorMessage(
-					t, err, "received message exceeds the allowed 0-byte size limit",
-				).Critical()
+				msgData, err := transport.ReadFromConnection(clientConn, inputLen-1, time.Millisecond)
+				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
+					"received message exceeds the allowed %d-byte size limit", inputLen-1,
+				)).Critical()
 				testutils.AssertEqual(t, msgData == nil, true).Critical()
-			}()
-
-			func() {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte("ab"))
-				testutils.AssertErrorIs(t, err, nil).Critical()
-
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
-				msgData, err := transport.ReadFromConnection(serverConn, 1, time.Millisecond)
-				testutils.AssertErrorMessage(
-					t, err, "received message exceeds the allowed 1-byte size limit",
-				).Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
-
-				err = transport.WriteToConnection(serverConn, []byte("ab"))
-				testutils.AssertErrorIs(t, err, nil).Critical()
-
-				msgData, err = transport.ReadFromConnection(clientConn, 1, time.Millisecond)
-				testutils.AssertErrorMessage(
-					t, err, "received message exceeds the allowed 1-byte size limit",
-				).Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
-			}()
-
-			func() {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte("😀"))
-				testutils.AssertErrorIs(t, err, nil).Critical()
-
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
-				msgData, err := transport.ReadFromConnection(serverConn, 3, time.Millisecond)
-				testutils.AssertErrorMessage(
-					t, err, "received message exceeds the allowed 3-byte size limit",
-				).Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
-
-				err = transport.WriteToConnection(serverConn, []byte("😀"))
-				testutils.AssertErrorIs(t, err, nil).Critical()
-
-				msgData, err = transport.ReadFromConnection(clientConn, 3, time.Millisecond)
-				testutils.AssertErrorMessage(
-					t, err, "received message exceeds the allowed 3-byte size limit",
-				).Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
-			}()
+			}
 		}
 
 		// use individual calls instead of a loop so that each case gets isolated arguments
@@ -237,40 +199,43 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			for _, inputStr := range []string{testutils.GenerateAlphanumeric(t), "😀"} {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte(inputStr))
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
+
+			inputEntries := []string{"ab", testutils.GenerateAlphanumeric(t), "😀"}
+
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(clientConn, []byte(inputVal))
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
-				msgData, err := transport.ReadFromConnection(serverConn, 0, time.Millisecond)
+				msgData, err := transport.ReadFromConnection(serverConn, inputLen-2, time.Millisecond)
 				testutils.AssertErrorMessage(t, err, "connection closed without end marker").Critical()
 				testutils.AssertEqual(t, msgData == nil, true).Critical()
 
-				err = transport.WriteToConnection(serverConn, []byte(inputStr))
-				testutils.AssertErrorIs(t, err, nil).Critical()
-
-				msgData, err = transport.ReadFromConnection(clientConn, 0, time.Millisecond)
-				testutils.AssertErrorMessage(t, err, "connection closed without end marker").Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
+				restData, err := io.ReadAll(serverConn) // read remaining bytes
+				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
+					"read %s %s->%s: i/o timeout", network, address, serverConn.RemoteAddr(),
+				)).Critical()
+				testutils.AssertEqual(t, restData, []byte{transport.MessageEndByte}).Critical()
 			}
 
-			for _, inputStr := range []string{testutils.GenerateAlphanumeric(t), "😀a"} {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte(inputStr))
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(serverConn, []byte(inputVal))
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
-				msgData, err := transport.ReadFromConnection(serverConn, 3, time.Millisecond)
+				msgData, err := transport.ReadFromConnection(clientConn, inputLen-2, time.Millisecond)
 				testutils.AssertErrorMessage(t, err, "connection closed without end marker").Critical()
 				testutils.AssertEqual(t, msgData == nil, true).Critical()
 
-				err = transport.WriteToConnection(serverConn, []byte(inputStr))
-				testutils.AssertErrorIs(t, err, nil).Critical()
-
-				msgData, err = transport.ReadFromConnection(clientConn, 3, time.Millisecond)
-				testutils.AssertErrorMessage(t, err, "connection closed without end marker").Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
+				restData, err := io.ReadAll(clientConn) // read remaining bytes
+				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
+					"read %s %s->%s: i/o timeout", network, clientConn.LocalAddr(), address,
+				)).Critical()
+				testutils.AssertEqual(t, restData, []byte{transport.MessageEndByte}).Critical()
 			}
 		}
 
@@ -292,26 +257,38 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			for _, maxMsgBytes := range []int{0, 1, 10} {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte("a"))
-				testutils.AssertErrorIs(t, err, nil).Critical()
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
-				msgData, err := transport.ReadFromConnection(serverConn, maxMsgBytes, 0)
-				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
-					"read %s %s->%s: i/o timeout", network, address, serverConn.RemoteAddr(),
-				)).Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
+			inputEntries := [][]byte{
+				nil, []byte(""), []byte(testutils.GenerateAlphanumeric(t)), []byte("😀"),
+			}
+			maxBytes := []int{0, 10}
 
-				err = transport.WriteToConnection(serverConn, []byte("a"))
-				testutils.AssertErrorIs(t, err, nil).Critical()
+			for _, inputVal := range inputEntries {
+				for _, maxMsgBytes := range maxBytes {
+					err := transport.WriteToConnection(clientConn, inputVal)
+					testutils.AssertErrorIs(t, err, nil).Critical()
 
-				msgData, err = transport.ReadFromConnection(clientConn, maxMsgBytes, 0)
-				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
-					"read %s %s->%s: i/o timeout", network, clientConn.LocalAddr(), address,
-				)).Critical()
-				testutils.AssertEqual(t, msgData == nil, true).Critical()
+					msgData, err := transport.ReadFromConnection(serverConn, maxMsgBytes, 0)
+					testutils.AssertErrorMessage(t, err, fmt.Sprintf(
+						"read %s %s->%s: i/o timeout", network, address, serverConn.RemoteAddr(),
+					)).Critical()
+					testutils.AssertEqual(t, msgData == nil, true).Critical()
+				}
+			}
+
+			for _, inputVal := range inputEntries {
+				for _, maxMsgBytes := range maxBytes {
+					err := transport.WriteToConnection(serverConn, inputVal)
+					testutils.AssertErrorIs(t, err, nil).Critical()
+
+					msgData, err := transport.ReadFromConnection(clientConn, maxMsgBytes, 0)
+					testutils.AssertErrorMessage(t, err, fmt.Sprintf(
+						"read %s %s->%s: i/o timeout", network, clientConn.LocalAddr(), address,
+					)).Critical()
+					testutils.AssertEqual(t, msgData == nil, true).Critical()
+				}
 			}
 		}
 
@@ -333,17 +310,21 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			for _, maxMsgBytes := range []int{0, 1, 10} {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
+			maxBytes := []int{0, 10}
+
+			for _, maxMsgBytes := range maxBytes {
 				msgData, err := transport.ReadFromConnection(serverConn, maxMsgBytes, time.Millisecond)
 				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 					"read %s %s->%s: i/o timeout", network, address, serverConn.RemoteAddr(),
 				)).Critical()
 				testutils.AssertEqual(t, msgData == nil, true).Critical()
+			}
 
-				msgData, err = transport.ReadFromConnection(clientConn, maxMsgBytes, time.Millisecond)
+			for _, maxMsgBytes := range maxBytes {
+				msgData, err := transport.ReadFromConnection(clientConn, maxMsgBytes, time.Millisecond)
 				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 					"read %s %s->%s: i/o timeout", network, clientConn.LocalAddr(), address,
 				)).Critical()
@@ -369,25 +350,33 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			// note: transport.WriteToConnection() would have written transport.MessageEndByte too, contrary
-			//       to *.Write()
-			for _, maxMsgBytes := range []int{0, 1, 10} {
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 
-				_, err := clientConn.Write([]byte("a"))
+			inputEntries := [][]byte{
+				nil, []byte(""), []byte(testutils.GenerateAlphanumeric(t)), []byte("😀"),
+			}
+			maxMsgBytes := transport.MaxSupportedMsgBytes
+
+			// note: *.Write() does not automatically write transport.MessageEndByte, unlike
+			//       transport.WriteToConnection()
+
+			for _, inputVal := range inputEntries {
+				_, err := clientConn.Write(inputVal)
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 				msgData, err := transport.ReadFromConnection(serverConn, maxMsgBytes, time.Millisecond)
 				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 					"read %s %s->%s: i/o timeout", network, address, serverConn.RemoteAddr(),
 				)).Critical()
 				testutils.AssertEqual(t, msgData == nil, true).Critical()
+			}
 
-				_, err = serverConn.Write([]byte("a"))
+			for _, inputVal := range inputEntries {
+				_, err := serverConn.Write(inputVal)
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				msgData, err = transport.ReadFromConnection(clientConn, maxMsgBytes, time.Millisecond)
+				msgData, err := transport.ReadFromConnection(clientConn, maxMsgBytes, time.Millisecond)
 				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 					"read %s %s->%s: i/o timeout", network, clientConn.LocalAddr(), address,
 				)).Critical()
@@ -405,7 +394,7 @@ func TestReadFromConnection(t *testing.T) {
 		}
 	})
 
-	t.Run("reads available data when below the maximum allowed size", func(t *testing.T) {
+	t.Run("reads available data when size is below the maximum expected", func(t *testing.T) {
 		check := func(e testutils.SocketEndpoint) {
 			defer e.Release(t)
 
@@ -413,24 +402,41 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			for _, inputStr := range []string{"", testutils.GenerateAlphanumeric(t), "😀"} {
-				inputLen := len(inputStr)
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte(inputStr))
+			inputEntries := [][]byte{
+				nil, []byte(""), []byte(testutils.GenerateAlphanumeric(t)), []byte("😀"),
+			}
+
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(clientConn, inputVal)
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 				msgData, err := transport.ReadFromConnection(serverConn, inputLen+1, time.Millisecond)
 				testutils.AssertEqual(t, err, nil).Critical()
-				testutils.AssertEqual(t, msgData, []byte(inputStr)).Critical()
+				if inputVal == nil {
+					testutils.AssertEqual(t, msgData, []byte{}).Critical()
+				} else {
+					testutils.AssertEqual(t, msgData, inputVal).Critical()
+				}
+			}
 
-				err = transport.WriteToConnection(serverConn, []byte(inputStr))
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(serverConn, inputVal)
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				msgData, err = transport.ReadFromConnection(clientConn, inputLen+1, time.Millisecond)
+				msgData, err := transport.ReadFromConnection(clientConn, inputLen+1, time.Millisecond)
 				testutils.AssertEqual(t, err, nil).Critical()
-				testutils.AssertEqual(t, msgData, []byte(inputStr)).Critical()
+				if inputVal == nil {
+					testutils.AssertEqual(t, msgData, []byte{}).Critical()
+				} else {
+					testutils.AssertEqual(t, msgData, inputVal).Critical()
+				}
 			}
 		}
 
@@ -444,7 +450,7 @@ func TestReadFromConnection(t *testing.T) {
 		}
 	})
 
-	t.Run("reads available data when at the maximum allowed size", func(t *testing.T) {
+	t.Run("reads available data when size is at the maximum expected", func(t *testing.T) {
 		check := func(e testutils.SocketEndpoint) {
 			defer e.Release(t)
 
@@ -452,24 +458,41 @@ func TestReadFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			for _, inputStr := range []string{"", testutils.GenerateAlphanumeric(t), "😀"} {
-				inputLen := len(inputStr)
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte(inputStr))
+			inputEntries := [][]byte{
+				nil, []byte(""), []byte(testutils.GenerateAlphanumeric(t)), []byte("😀"),
+			}
+
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(clientConn, []byte(inputVal))
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 				msgData, err := transport.ReadFromConnection(serverConn, inputLen, time.Millisecond)
 				testutils.AssertEqual(t, err, nil).Critical()
-				testutils.AssertEqual(t, msgData, []byte(inputStr)).Critical()
+				if inputVal == nil {
+					testutils.AssertEqual(t, msgData, []byte{}).Critical()
+				} else {
+					testutils.AssertEqual(t, msgData, inputVal).Critical()
+				}
+			}
 
-				err = transport.WriteToConnection(serverConn, []byte(inputStr))
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(serverConn, []byte(inputVal))
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				msgData, err = transport.ReadFromConnection(clientConn, inputLen, time.Millisecond)
+				msgData, err := transport.ReadFromConnection(clientConn, inputLen, time.Millisecond)
 				testutils.AssertEqual(t, err, nil).Critical()
-				testutils.AssertEqual(t, msgData, []byte(inputStr)).Critical()
+				if inputVal == nil {
+					testutils.AssertEqual(t, msgData, []byte{}).Critical()
+				} else {
+					testutils.AssertEqual(t, msgData, inputVal).Critical()
+				}
 			}
 		}
 
@@ -493,10 +516,14 @@ func TestWriteFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			for _, inputStr := range []string{"", testutils.GenerateAlphanumeric(t), "😀"} {
+			inputEntries := [][]byte{
+				nil, []byte(""), []byte(testutils.GenerateAlphanumeric(t)), []byte("😀"),
+			}
+
+			for _, inputVal := range inputEntries {
 				clientConn := testutils.ConnectToSocketServer(t, network, address)
 				clientConn.Close() // test one failure scenario among several
-				err := transport.WriteToConnection(clientConn, []byte(inputStr))
+				err := transport.WriteToConnection(clientConn, inputVal)
 				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 					"write %s %s->%s: use of closed network connection",
 					network, clientConn.LocalAddr(), address,
@@ -505,7 +532,7 @@ func TestWriteFromConnection(t *testing.T) {
 				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 				serverConn.SetReadDeadline(time.Now().Add(time.Millisecond))
 				serverConn.Close() // test one failure scenario among several
-				err = transport.WriteToConnection(serverConn, []byte(inputStr))
+				err = transport.WriteToConnection(serverConn, inputVal)
 				testutils.AssertErrorMessage(t, err, fmt.Sprintf(
 					"write %s %s->%s: use of closed network connection",
 					network, address, serverConn.RemoteAddr(),
@@ -523,7 +550,7 @@ func TestWriteFromConnection(t *testing.T) {
 		}
 	})
 
-	t.Run("writes input data followed by MessageEndByte", func(t *testing.T) {
+	t.Run("writes input data followed by MessageEndByte otherwise", func(t *testing.T) {
 		check := func(e testutils.SocketEndpoint) {
 			defer e.Release(t)
 
@@ -531,24 +558,31 @@ func TestWriteFromConnection(t *testing.T) {
 			network := e.Network
 			address := listener.Addr().String()
 
-			for _, inputStr := range []string{"", testutils.GenerateAlphanumeric(t), "😀"} {
-				inputLen := len(inputStr)
+			clientConn := testutils.ConnectToSocketServer(t, network, address)
+			serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 
-				clientConn := testutils.ConnectToSocketServer(t, network, address)
-				err := transport.WriteToConnection(clientConn, []byte(inputStr))
+			inputEntries := [][]byte{
+				nil, []byte(""), []byte(testutils.GenerateAlphanumeric(t)), []byte("😀"),
+			}
+
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(clientConn, inputVal)
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
-				serverConn := testutils.WaitForConnectionToSocketServer(t, listener)
 				serverConn.SetReadDeadline(time.Now().Add(time.Millisecond))
 				func() {
+					// read expected bytes
 					buf := make([]byte, inputLen+1)
 					n, err := io.ReadFull(serverConn, buf)
-					msgData := append([]byte(inputStr), transport.MessageEndByte)
+					msgData := append(inputVal, transport.MessageEndByte)
 					testutils.AssertEqual(t, err, nil).Critical()
 					testutils.AssertEqual(t, n, inputLen+1).Critical()
 					testutils.AssertEqual(t, buf, msgData).Critical()
 				}()
 				func() {
+					// ensure no more bytes are available
 					buf := make([]byte, 1)
 					n, err := io.ReadFull(serverConn, buf)
 					msgData := make([]byte, 1)
@@ -558,20 +592,26 @@ func TestWriteFromConnection(t *testing.T) {
 					testutils.AssertEqual(t, n, 0).Critical()
 					testutils.AssertEqual(t, buf, msgData).Critical()
 				}()
+			}
 
-				err = transport.WriteToConnection(serverConn, []byte(inputStr))
+			for _, inputVal := range inputEntries {
+				inputLen := len(inputVal)
+
+				err := transport.WriteToConnection(serverConn, inputVal)
 				testutils.AssertErrorIs(t, err, nil).Critical()
 
 				clientConn.SetReadDeadline(time.Now().Add(time.Millisecond))
 				func() {
+					// read expected bytes
 					buf := make([]byte, inputLen+1)
 					n, err := io.ReadFull(clientConn, buf)
-					msgData := append([]byte(inputStr), transport.MessageEndByte)
+					msgData := append(inputVal, transport.MessageEndByte)
 					testutils.AssertEqual(t, err, nil).Critical()
 					testutils.AssertEqual(t, n, inputLen+1).Critical()
 					testutils.AssertEqual(t, buf, msgData).Critical()
 				}()
 				func() {
+					// ensure no more bytes are available
 					buf := make([]byte, 1)
 					n, err := io.ReadFull(clientConn, buf)
 					msgData := make([]byte, 1)

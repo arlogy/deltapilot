@@ -11,12 +11,18 @@ import (
 
 func GenerateAlphanumeric(t *testing.T) string {
 	t.Helper()
-	return random.NewAlphanumeric(random.UniqueStrLen)
+	return random.NewAlphanumeric(random.RandomSequenceLen)
 }
 
 func GenerateBytes(t *testing.T) []byte {
 	t.Helper()
-	return []byte(GenerateID(t))
+
+	data, err := random.NewSecureBytes(random.RandomSequenceLen)
+	if err != nil {
+		t.Fatalf("%v", failures.AsErrorWithSemantics(err))
+	}
+
+	return data
 }
 
 func GenerateID(t *testing.T) string {
