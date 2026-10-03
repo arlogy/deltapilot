@@ -44,7 +44,7 @@ func (r *ServerRuntime) ConnActiveCount() int64 {
 
 // StartServer creates a server endpoint, starts serving clients, and blocks until stopped.
 //   - cfg describes the server configuration.
-//   - logger logs server diagnostics and is assumed to be non-nil; when logging is not needed, NopLogger()
+//   - logger logs server diagnostics and is assumed to be non-nil; when logging is not needed, NewNopLogger()
 //     may be passed.
 //   - onMessage is an optional callback called when the server receives a message from a client.
 //   - stopCtx signals when the server must stop, allowing proper cleanup.

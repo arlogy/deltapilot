@@ -20,7 +20,7 @@ type ClientConfig struct {
 
 // StartClient creates and connects a client to a server endpoint.
 //   - cfg describes the client configuration.
-//   - logger logs client diagnostics and is assumed to be non-nil; when logging is not needed, NopLogger()
+//   - logger logs client diagnostics and is assumed to be non-nil; when logging is not needed, NewNopLogger()
 //     may be passed.
 //   - readClientMessage provides the message that the client must send to the server.
 //   - stopCtx signals when an early stop is requested, allowing proper cleanup in that case.

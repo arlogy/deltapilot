@@ -24,7 +24,6 @@ func runServer(
 ) {
 	subFlags := flag.NewFlagSet(subCommand, flag.ExitOnError)
 	nettype := subFlags.String("nettype", defaultNet, "network type passed to the networking layer")
-
 	netaddr := subFlags.String("netaddr", defaultAddr, "network address to listen on for nettype")
 	maxMsgBytes := subFlags.Int("max-message-bytes", defaultMaxBytesPerMsg, "maximum message size in bytes")
 	maxConcurrentMsgs := subFlags.Int(

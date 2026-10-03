@@ -381,7 +381,7 @@ func TestStartClient(t *testing.T) {
 					MaxConcurrentMsgs: 1,
 					ReadTimeout:       baseTimeout,
 				}
-				transport.StartServer(cfg, transport.NopLogger(), nil, context.Background(), runtimeCh)
+				transport.StartServer(cfg, transport.NewNopLogger(), nil, context.Background(), runtimeCh)
 			}()
 
 			runtimeInfo := <-runtimeCh // wait for the server's runtime information
@@ -469,7 +469,7 @@ func TestStartClient(t *testing.T) {
 					MaxConcurrentMsgs: 1,
 					ReadTimeout:       baseTimeout,
 				}
-				transport.StartServer(cfg, transport.NopLogger(), nil, context.Background(), runtimeCh)
+				transport.StartServer(cfg, transport.NewNopLogger(), nil, context.Background(), runtimeCh)
 			}()
 
 			runtimeInfo := <-runtimeCh // wait for the server's runtime information
