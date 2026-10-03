@@ -18,19 +18,19 @@ var socketTestFilePath = filepath.Join(os.TempDir(), "deltapilot_socket_test.soc
 
 var SocketTCPIPAny = SocketEndpoint{
 	Network: "tcp",
-	Address: "127.0.0.1:0", // port 0 lets the OS choose any available port
+	Address: "127.0.0.1:0", // see dynamic_port below
 	Release: func(t *testing.T) {},
 }
 
 var SocketTCPIPv4 = SocketEndpoint{
 	Network: "tcp4",
-	Address: "127.0.0.1:0", // port 0 lets the OS choose any available port
+	Address: "127.0.0.1:0", // see dynamic_port below
 	Release: func(t *testing.T) {},
 }
 
 var SocketTCPIPv6 = SocketEndpoint{
 	Network: "tcp6",
-	Address: "[::1]:0", // port 0 lets the OS choose any available port
+	Address: "[::1]:0", // see dynamic_port below
 	Release: func(t *testing.T) {},
 }
 
@@ -59,3 +59,7 @@ var SocketUnixPacket = SocketEndpoint{
 		}
 	},
 }
+
+// (dynamic_port)
+//     port 0 lets the OS choose any available port during server setup: listener, err := net.Listen()
+//     listener.Addr().String() returns the listener address, which can be used to connect to the server

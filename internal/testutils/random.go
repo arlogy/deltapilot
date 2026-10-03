@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"fmt"
 	"math/rand/v2"
 	"testing"
 	"time"
@@ -11,6 +12,7 @@ import (
 
 func GenerateAlphanumeric(t *testing.T) string {
 	t.Helper()
+
 	return random.NewAlphanumeric(random.RandomSequenceLen)
 }
 
@@ -23,6 +25,12 @@ func GenerateBytes(t *testing.T) []byte {
 	}
 
 	return data
+}
+
+func GenerateError(t *testing.T) error {
+	t.Helper()
+
+	return fmt.Errorf("fake test error: %s", GenerateAlphanumeric(t))
 }
 
 func GenerateID(t *testing.T) string {
@@ -38,6 +46,7 @@ func GenerateID(t *testing.T) string {
 
 func GeneratePointerID(t *testing.T) *string {
 	t.Helper()
+
 	return new(GenerateID(t))
 }
 
