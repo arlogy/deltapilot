@@ -19,11 +19,12 @@ func runServer(
 	defaultMaxBytesPerMsg int,
 	defaultMaxMsgs int,
 	defaultTimeout time.Duration,
-	logger transport.NetLogger,
-	onMessage func(msgData []byte, logger transport.NetLogger),
+	logger transport.Logger,
+	onMessage func(msgData []byte, logger transport.Logger),
 ) {
 	subFlags := flag.NewFlagSet(subCommand, flag.ExitOnError)
-	nettype := subFlags.String("nettype", defaultNet, "network type (tcp, tcp4, tcp6, unix or unixpacket)")
+	nettype := subFlags.String("nettype", defaultNet, "network type passed to the networking layer")
+
 	netaddr := subFlags.String("netaddr", defaultAddr, "network address to listen on for nettype")
 	maxMsgBytes := subFlags.Int("max-message-bytes", defaultMaxBytesPerMsg, "maximum message size in bytes")
 	maxConcurrentMsgs := subFlags.Int(
@@ -39,9 +40,16 @@ func runServer(
 		os.Exit(2) // same exit status as subFlags.Parse() above
 	}
 
-	transport.StartServer(
-		*nettype, *netaddr, *maxMsgBytes, *maxConcurrentMsgs, *readTimeout, logger, onMessage,
-	)
+	cfg := transport.ServerConfig{
+		Network:           *nettype,
+		Address:           *netaddr,
+		MaxMsgBytes:       *maxMsgBytes,
+		MaxConcurrentMsgs: *maxConcurrentMsgs,
+		ReadTimeout:       *readTimeout,
+	}
+	stopCtx, cancel := process.CreateShutdownContext()
+	defer cancel() // stop signal interception only after the server has finished, including its cleanup
+	transport.StartServer(cfg, logger, onMessage, stopCtx, nil)
 }
 
 func runClient(
@@ -50,17 +58,17 @@ func runClient(
 	defaultNet string,
 	defaultAddr string,
 	defaultTimeout time.Duration,
-	logger transport.NetLogger,
-	onAck func(ackData []byte, logger transport.NetLogger),
+	logger transport.Logger,
+	onAck func(logger transport.Logger),
 ) {
 	subFlags := flag.NewFlagSet(subCommand, flag.ExitOnError)
-	nettype := subFlags.String("nettype", defaultNet, "network type (tcp, tcp4, tcp6, unix or unixpacket)")
+	nettype := subFlags.String("nettype", defaultNet, "network type passed to the networking layer")
 	netaddr := subFlags.String("netaddr", defaultAddr, "network address to connect to for nettype")
 	ackTimeout := subFlags.Duration(
 		"ack-timeout",
 		defaultTimeout,
 		strings.Join([]string{
-			"should be at least as long as the server's read timeout to prevent premature timeouts",
+			"should be at least as long as the server's read timeout so the client does not time out first",
 			"it is the maximum time to wait for an acknowledgement",
 		}, "\n"),
 	)
@@ -71,5 +79,12 @@ func runClient(
 		os.Exit(2) // same exit status as subFlags.Parse() above
 	}
 
-	transport.StartClient(*nettype, *netaddr, *ackTimeout, logger, process.ReadFromStdin, onAck)
+	cfg := transport.ClientConfig{
+		Network:    *nettype,
+		Address:    *netaddr,
+		AckTimeout: *ackTimeout,
+	}
+	stopCtx, cancel := process.CreateShutdownContext()
+	defer cancel() // stop signal interception only after the client has finished, including its cleanup
+	transport.StartClient(cfg, logger, process.ReadFromStdin, onAck, stopCtx)
 }

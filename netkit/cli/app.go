@@ -14,9 +14,9 @@ func RunApp(
 	defaultMaxBytesPerMsg int,
 	defaultMaxMsgs int,
 	defaultTimeout time.Duration,
-	logger transport.NetLogger,
-	messageReceivedHandler func(msgData []byte, logger transport.NetLogger),
-	ackReceivedHandler func(ackData []byte, logger transport.NetLogger),
+	logger transport.Logger,
+	messageReceivedHandler func(msgData []byte, logger transport.Logger),
+	ackReceivedHandler func(logger transport.Logger),
 ) {
 	subCommand := ""
 	if len(os.Args) > 1 {

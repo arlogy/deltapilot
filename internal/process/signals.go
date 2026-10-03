@@ -6,24 +6,14 @@ import (
 	"os/signal"
 )
 
-// RegisterSignalHandler intercepts signals and invokes a handler when one of them is received.
-//   - An empty signal list means all signals.
-//   - Signal handling is stopped before the handler is called, restoring the default signal behavior when no
-//     other handlers are registered.
-//   - When multiple handlers are registered for the same signal, their invocation order is unspecified.
-func RegisterSignalHandler(onSignal func(), signals ...os.Signal) context.Context {
-	// create and notify ctx when one of the listed signals is received; stop() disables notification
-	ctx, stop := signal.NotifyContext(
-		context.Background(),
-		signals..., // note: empty signal list means all signals
-	)
-
-	// wait for signal notification
-	go func() {
-		<-ctx.Done()
-		stop()
-		onSignal()
-	}()
-
-	return ctx
+// CreateContextFromSignals creates a context that is notified when one of the listed signals is intercepted,
+// or any signal when none is listed.
+//   - <-ctx.Done() can be used to wait for the first signal notification.
+//   - stop() can be called to stop receiving signal notifications, restoring the default signal behavior for
+//     any of these signals that no context is notified of anymore.
+//   - When multiple contexts are created to receive notification of the same signals, the notification order
+//     is unspecified.
+func CreateContextFromSignals(signals ...os.Signal) (context.Context, context.CancelFunc) {
+	ctx, stop := signal.NotifyContext(context.Background(), signals...)
+	return ctx, stop
 }
