@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/arlogy/deltapilot/internal/channels"
+	"github.com/arlogy/deltapilot/netkit/protocol"
 )
 
 const serverAck = "OK"
@@ -26,7 +27,7 @@ type ServerRuntime struct {
 	serverAddr net.Addr
 	// the number of clients accepted but not yet scheduled for serving; at most 1
 	clientPendingCount atomic.Int64
-	// the number of clients currently being served; at most the allowed limit
+	// the number of clients currently being served; at most the configured limit
 	clientActiveCount atomic.Int64
 }
 
@@ -34,11 +35,11 @@ func (r *ServerRuntime) BoundAddr() net.Addr {
 	return r.serverAddr
 }
 
-func (r *ServerRuntime) ConnPendingCount() int64 {
+func (r *ServerRuntime) PendingConnCount() int64 {
 	return r.clientPendingCount.Load()
 }
 
-func (r *ServerRuntime) ConnActiveCount() int64 {
+func (r *ServerRuntime) ActiveConnCount() int64 {
 	return r.clientActiveCount.Load()
 }
 
@@ -52,6 +53,9 @@ func (r *ServerRuntime) ConnActiveCount() int64 {
 //     access to server information while keeping the entire server lifecycle (create, serve, stop) within a
 //     single function, avoiding the need to handle invalid operations such as attempting to start serving
 //     clients more than once or after the server has stopped and its listener has been closed.
+//
+// I/O capabilities are accessed by calling protocol.* functions directly, rather than through a DataIO
+// wrapper passed to the function. This avoids exposing internally managed connection objects.
 func StartServer(
 	cfg ServerConfig,
 	logger Logger,
@@ -77,7 +81,11 @@ func StartServer(
 		return false
 	}
 	defer listener.Close()
-	logger.LogInfo("listening on %q (%q)", listener.Addr().String(), listener.Addr().Network())
+	logger.LogInfo(
+		"listening on %q (%q)",
+		listener.Addr().String(),
+		network, // log the requested network for clarity, as listener.Addr().Network() may differ
+	)
 
 	// report the server runtime information if requested
 	runtimeInfo := ServerRuntime{
@@ -86,11 +94,13 @@ func StartServer(
 		clientActiveCount:  atomic.Int64{},
 	}
 	if runtimeCh != nil {
-		runtimeCh <- &runtimeInfo
+		go func() {
+			runtimeCh <- &runtimeInfo
+		}()
 	}
 
 	// set up a stop listener
-	channels.RunOnReceive(stopCtx.Done(), func() {
+	channels.RunWhenUnblocked(stopCtx.Done(), func() {
 		listener.Close() // this unblocks listener.Accept(), causing it to return an error
 	})
 
@@ -101,8 +111,8 @@ serveLoop:
 		// accept a connection from a client
 		conn, err := listener.Accept()
 		if err != nil {
-			if stopCtx.Err() != nil {
-				break // stop requested
+			if stopCtx.Err() != nil { // stop requested
+				break
 			}
 			logger.LogError("failed to accept client connection: %v", err)
 			continue
@@ -143,7 +153,7 @@ func handleClientConnection(
 	defer conn.Close()
 
 	// receive a message from the client
-	msgData, err := ReadFromConnection(conn, maxMsgBytes, readTimeout)
+	msgData, err := protocol.ReadFromConnection(conn, maxMsgBytes, readTimeout)
 	if err != nil {
 		logger.LogError("failed to read client message: %v", err)
 		return
@@ -153,7 +163,7 @@ func handleClientConnection(
 	}
 
 	// send an acknowledgement to the client
-	if err := WriteToConnection(conn, []byte(serverAck)); err != nil {
+	if err := protocol.WriteToConnection(conn, []byte(serverAck)); err != nil {
 		logger.LogError("failed to send acknowledgement to client: %v", err)
 		return
 	}

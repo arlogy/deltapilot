@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path/filepath"
 	"time"
@@ -20,7 +21,7 @@ func main() {
 	defaultMaxMsgs := 64
 	defaultTimeout := 30 * time.Second
 
-	logger := transport.NewtDefaultLogger()
+	logger := transport.NewDefaultLogger(log.Default())
 
 	cli.RunApp(
 		defaultNet,

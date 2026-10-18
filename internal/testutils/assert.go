@@ -68,11 +68,22 @@ func AssertErrorMessage(t *testing.T, got error, wantMsg string) AssertionResult
 	t.Helper()
 
 	if got == nil {
-		t.Error("got nil error, want non-nil error")
+		t.Errorf("got nil error, want non-nil error [%s]", wantMsg)
 		return assertionFailed(t)
 	}
 
 	return AssertEqual(t, got.Error(), wantMsg)
+}
+
+func AssertErrorNotNil(t *testing.T, got error) AssertionResult {
+	t.Helper()
+
+	if got == nil {
+		t.Error("got nil error, want non-nil error")
+		return assertionFailed(t)
+	}
+
+	return assertionPassed(t)
 }
 
 func AssertFieldNamesEqual(t *testing.T, data any, wantNames []string) AssertionResult {
@@ -140,6 +151,24 @@ func AssertTimeLocationIs(t *testing.T, got time.Time, wantLoc *time.Location) A
 	gotLoc := got.Location()
 	if gotLoc != wantLoc {
 		t.Errorf("got time location [%v], want [%v]; location pointers differ", gotLoc, wantLoc)
+		return assertionFailed(t)
+	}
+
+	return assertionPassed(t)
+}
+
+func AssertTimeWas(t *testing.T, got time.Time, want time.Time, tolerance time.Duration) AssertionResult {
+	t.Helper()
+
+	// expected condition: "got" was "want" at most "tolerance" ago (want-tolerance <= got <= want)
+
+	if tolerance < 0 {
+		t.Errorf("tolerance must be non-negative, got %v", tolerance)
+		return assertionFailed(t)
+	}
+
+	if got.Before(want.Add(-tolerance)) || got.After(want) {
+		t.Errorf("want [%v] within %v before or equal to [%v], got %v", got, tolerance, want, want.Sub(got))
 		return assertionFailed(t)
 	}
 

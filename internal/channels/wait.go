@@ -1,31 +1,34 @@
 package channels
 
-import "time"
+import (
+	"errors"
+	"fmt"
+	"time"
+)
 
-// RunOnReceive asynchronously waits for a value from a receiver channel, then calls a function in response.
-func RunOnReceive(ch <-chan struct{}, onReceived func()) {
+// RunWhenUnblocked asynchronously waits until receiving from a channel does not block, then calls a function.
+func RunWhenUnblocked(ch <-chan struct{}, onReady func()) {
 	go func() {
 		<-ch
-		onReceived()
+		onReady()
 	}()
 }
 
-// WaitForReturn waits until a function returns or timeout occurs.
-func WaitForReturn(timeout time.Duration, operation func()) bool {
-	done := make(chan struct{})
-
-	go func() {
-		operation()
-		close(done)
-	}()
-
+// WaitForValue waits for a value to be received from a channel. It returns an error on timeout or when the
+// channel is closed.
+func WaitForValue[T any](timeout time.Duration, ch <-chan T) (T, error) {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
 	select {
-	case <-done:
-		return true
+	case value, ok := <-ch:
+		if !ok {
+			var zero T
+			return zero, errors.New("channel closed before receiving a value")
+		}
+		return value, nil
 	case <-timer.C:
-		return false
+		var zero T
+		return zero, fmt.Errorf("timed out after %s waiting for a value", timeout)
 	}
 }

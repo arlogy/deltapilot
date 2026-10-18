@@ -1,8 +1,6 @@
 package random
 
 import (
-	"fmt"
-
 	"github.com/arlogy/deltapilot/internal/failures"
 	"github.com/google/uuid"
 )
@@ -12,14 +10,10 @@ func NewUUIDv7() (string, error) {
 	newID, err := uuid.NewV7()
 	if err != nil {
 		return "", &failures.DetailedError{
-			PublicCause:   WrapUUIDv7GenerationError(),
+			PublicCause:   WrapDataGenerationError("failed to generate UUIDv7"),
 			InternalCause: err,
 		}
 	}
 
 	return newID.String(), nil
-}
-
-func WrapUUIDv7GenerationError() error {
-	return fmt.Errorf("%w: failed to generate UUIDv7", ErrDataGeneration)
 }

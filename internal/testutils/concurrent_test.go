@@ -26,7 +26,10 @@ func TestRunConcurrently(t *testing.T) {
 			return result
 		}()
 
-		testutils.AssertEqual(t, flawedCount < testutils.WorkerCount, true)
-		testutils.AssertEqual(t, exactCount, int64(testutils.WorkerCount))
+		const targetCount = testutils.WorkerCount
+		if !(flawedCount < targetCount) {
+			t.Errorf("expected %d < %d", flawedCount, targetCount)
+		}
+		testutils.AssertEqual(t, exactCount, int64(targetCount))
 	})
 }

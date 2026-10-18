@@ -13,18 +13,18 @@ import (
 func GenerateAlphanumeric(t *testing.T) string {
 	t.Helper()
 
-	return random.NewAlphanumeric(random.RandomSequenceLen)
+	str, err := random.NewAlphanumeric(random.RandomSequenceLen)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return str
 }
 
 func GenerateBytes(t *testing.T) []byte {
 	t.Helper()
 
-	data, err := random.NewSecureBytes(random.RandomSequenceLen)
-	if err != nil {
-		t.Fatalf("%v", failures.AsErrorWithSemantics(err))
-	}
-
-	return data
+	return GenerateNBytes(t, random.RandomSequenceLen)
 }
 
 func GenerateError(t *testing.T) error {
@@ -33,6 +33,11 @@ func GenerateError(t *testing.T) error {
 	return fmt.Errorf("fake test error: %s", GenerateAlphanumeric(t))
 }
 
+// GenerateID returns a random identifier.
+//   - Although the returned value may be seen as an arbitrary string, it is meant for use in identification
+//     contexts, unlike GenerateAlphanumeric() for example.
+//   - Its output format is UUIDv7. This is intentional because IDs may be stored in UUID database columns and
+//     UUIDv7 provides time-ordered values that callers may rely on when sorting.
 func GenerateID(t *testing.T) string {
 	t.Helper()
 
@@ -42,6 +47,23 @@ func GenerateID(t *testing.T) string {
 	}
 
 	return id
+}
+
+func GenerateMarker(t *testing.T, label string) string {
+	t.Helper()
+
+	return fmt.Sprintf("%s - %s", label, GenerateAlphanumeric(t)) // unique and recognizable
+}
+
+func GenerateNBytes(t *testing.T, n int) []byte {
+	t.Helper()
+
+	data, err := random.NewSecureBytes(n)
+	if err != nil {
+		t.Fatalf("%v", failures.AsErrorWithSemantics(err))
+	}
+
+	return data
 }
 
 func GeneratePointerID(t *testing.T) *string {

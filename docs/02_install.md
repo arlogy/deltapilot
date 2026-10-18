@@ -57,8 +57,9 @@ depend on other packages used internally by their APIs or test code.
 
 netkit provides a flexible client-server architecture built around the Go [net](https://pkg.go.dev/net)
 package.
-- `netkit/transport` exposes the communication API.
-- `netkit/cli` exposes an API for CLI integration.
+- `netkit/protocol` defines message format and rules of communication.
+- `netkit/transport` exposes a client/server API built around the protocol.
+- `netkit/cli` enables integration of client/server functionality into CLI applications.
 
 When running a CLI application powered by netkit, please keep the following in mind.
 - Server: for `-nettype` and `-netaddr`, see [net.Listen](https://pkg.go.dev/net#Listen) for supported

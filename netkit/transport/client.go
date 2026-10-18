@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/arlogy/deltapilot/internal/channels"
+	"github.com/arlogy/deltapilot/netkit/protocol"
 )
 
 // ClientConfig contains the configuration of a client.
@@ -22,12 +23,16 @@ type ClientConfig struct {
 //   - cfg describes the client configuration.
 //   - logger logs client diagnostics and is assumed to be non-nil; when logging is not needed, NewNopLogger()
 //     may be passed.
-//   - readClientMessage provides the message that the client must send to the server.
+//   - readClientData provides the data that the client must send to the server.
+//   - onAck is an optional callback called when the client receives acknowledgement from the server.
 //   - stopCtx signals when an early stop is requested, allowing proper cleanup in that case.
+//
+// I/O capabilities are accessed by calling protocol.* functions directly, rather than through a DataIO
+// wrapper passed to the function. This avoids exposing internally managed connection objects.
 func StartClient(
 	cfg ClientConfig,
 	logger Logger,
-	readClientMessage func() ([]byte, error),
+	readClientData func() ([]byte, error),
 	onAck func(logger Logger),
 	stopCtx context.Context,
 ) bool {
@@ -40,14 +45,14 @@ func StartClient(
 		return false
 	}
 
-	// read the client message
-	if readClientMessage == nil {
-		logger.LogError("failed to read client message: reader function not provided")
+	// read the client data
+	if readClientData == nil {
+		logger.LogError("failed to read client data: reader function not provided")
 		return false
 	}
-	msgData, err := readClientMessage()
+	wireData, err := readClientData()
 	if err != nil {
-		logger.LogError("failed to read client message: %v", err)
+		logger.LogError("failed to read client data: %v", err)
 		return false
 	}
 
@@ -60,23 +65,23 @@ func StartClient(
 	defer conn.Close()
 
 	// set up an early-stop listener
-	channels.RunOnReceive(stopCtx.Done(), func() {
+	channels.RunWhenUnblocked(stopCtx.Done(), func() {
 		conn.Close() // this unblocks pending operations on conn, causing them to return an error
 	})
 
-	// send the message to the server
-	if err := WriteToConnection(conn, msgData); err != nil {
-		logger.LogError("failed to send message to server: %v", err)
+	// send the client data to the server
+	if err := protocol.WriteToConnection(conn, wireData); err != nil {
+		logger.LogError("failed to send client data to server%s: %v", clientStopAnnotation(stopCtx), err)
 		return false
 	}
 
 	// receive server acknowledgement; failure to do so means successful processing cannot be confirmed
-	ackData, err := ReadFromConnection(conn, len(serverAck), ackTimeout)
+	ackData, err := protocol.ReadFromConnection(conn, len(serverAck), ackTimeout)
 	if err != nil {
-		logger.LogError("failed to read server acknowledgement: %v", err)
+		logger.LogError("failed to read server acknowledgement%s: %v", clientStopAnnotation(stopCtx), err)
 		return false
 	}
-	if !bytes.Equal(ackData, []byte(serverAck)) { // abnormal case; development error
+	if !bytes.Equal(ackData, []byte(serverAck)) {
 		logger.LogError("unexpected server acknowledgement: %q", ackData)
 		return false
 	}
@@ -86,6 +91,13 @@ func StartClient(
 	}
 
 	return true
+}
+
+func clientStopAnnotation(stopCtx context.Context) string {
+	if stopCtx.Err() != nil { // stop requested
+		return " (and client stop was requested)"
+	}
+	return ""
 }
 
 func validateClientConfig(network string, address string, ackTimeout time.Duration, logger Logger) bool {

@@ -14,5 +14,13 @@ Run tests.
 path.
 - Use the `-count=1` option to force tests to run again instead of using cached results.
 - Use the `-short` or `-short=true` option for faster development feedback. This works because the test code
-relies on `testing.Short()` to skip concurrency tests, which could otherwise take several seconds to run
-against database-backed stores.
+relies on `testing.Short()` to skip concurrency tests (which can take more than a minute to run against some
+database-backed stores).
+
+Flaky test detection.
+- Note: we aim to identify tests that exhibit recurring failures due to timing, scheduling, or synchronization
+issues, rather than configuring excessively long timeouts that mask underlying problems. To achieve this, we
+repeat each test command that is prone to these failures a fixed number of times, using an arbitrary
+repetition limit, as illustrated below.
+- netkit: run `go test ./netkit/<package_name> -count=40` or `go test ./netkit/... -count=40` to detect
+unreliable read/write timeouts and verify that tests pass consistently across repeated runs.
