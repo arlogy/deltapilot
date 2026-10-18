@@ -35,7 +35,7 @@ func (c *StubConn) SetReadDeadline(t time.Time) error {
 
 	if fns, ok := v.([]func(time.Time) error); ok {
 		if seq, ok := c.OverrideSequencers[methodKey]; ok && seq != nil {
-			if i, err := seq.GetCurrent(); err == nil && i >= 0 && i < int64(len(fns)) {
+			if i, err := seq.GetValue(); err == nil && i >= 0 && i < int64(len(fns)) {
 				if j, err := seq.Next(); err == nil && j == i+1 {
 					return fns[i](t)
 				}
@@ -68,7 +68,7 @@ func (c *StubConn) Write(b []byte) (int, error) {
 
 	if fns, ok := v.([]func([]byte) (int, error)); ok {
 		if seq, ok := c.OverrideSequencers[methodKey]; ok && seq != nil {
-			if i, err := seq.GetCurrent(); err == nil && i >= 0 && i < int64(len(fns)) {
+			if i, err := seq.GetValue(); err == nil && i >= 0 && i < int64(len(fns)) {
 				if j, err := seq.Next(); err == nil && j == i+1 {
 					return fns[i](b)
 				}

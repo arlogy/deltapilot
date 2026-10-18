@@ -3,26 +3,37 @@ package sequencer
 import (
 	"errors"
 	"math"
-	"sync/atomic"
+	"sync"
 )
 
 type Numeric struct {
-	counter atomic.Int64
+	mu      sync.RWMutex
+	counter int64
 }
 
 func (n *Numeric) Next() (int64, error) {
-	if n.counter.Load() == math.MaxInt64 {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	if n.counter == math.MaxInt64 {
 		return 0, errors.New("numeric sequencer overflow: maximum value reached")
 	}
 
-	return n.counter.Add(1), nil
+	n.counter++
+	return n.counter, nil
 }
 
-func (n *Numeric) GetCurrent() (int64, error) {
-	return n.counter.Load(), nil
+func (n *Numeric) GetValue() (int64, error) {
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+
+	return n.counter, nil
 }
 
-func (n *Numeric) SetCurrent(v int64) error {
-	n.counter.Store(v)
+func (n *Numeric) SetValue(v int64) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+
+	n.counter = v
 	return nil
 }
