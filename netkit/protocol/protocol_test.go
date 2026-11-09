@@ -3,7 +3,6 @@ package protocol_test
 import (
 	"bytes"
 	"fmt"
-	"math/rand/v2"
 	"net"
 	"runtime"
 	"testing"
@@ -48,28 +47,40 @@ func readMessageFail(
 	conn net.Conn,
 	maxMsgBytes int,
 	readTimeout time.Duration,
-	wantErrMsg string,
+	wantErr error,
+	wantFailure string,
 ) {
 	t.Helper()
 
-	msgData, err := protocol.ReadFromConnection(conn, maxMsgBytes, readTimeout)
-	testutils.AssertErrorMessage(t, err, wantErrMsg).Critical()
+	msgData, gotErr := protocol.ReadFromConnection(conn, maxMsgBytes, readTimeout)
+
+	testutils.AssertErrorIs(t, gotErr, wantErr).Critical()
+	testutils.AssertErrorMessage(t, gotErr, wantErr.Error()+": "+wantFailure).Critical()
+
 	testutils.AssertEqual(t, msgData == nil, true).Critical()
 }
 
-func readMessageErrorAfterRead(
+func readMessageDoubleFail(
 	t *testing.T,
 	conn net.Conn,
 	maxMsgBytes int,
 	readTimeout time.Duration,
-	wantErrMsg string,
-	wantData []byte,
+	wantErrs [2]error,
+	wantFailures [2]string,
 ) {
 	t.Helper()
 
-	msgData, err := protocol.ReadFromConnection(conn, maxMsgBytes, readTimeout)
-	testutils.AssertErrorMessage(t, err, wantErrMsg).Critical()
-	testutils.AssertEqual(t, msgData, wantData).Critical()
+	msgData, gotErr := protocol.ReadFromConnection(conn, maxMsgBytes, readTimeout)
+
+	for _, wantErr := range wantErrs {
+		testutils.AssertErrorIs(t, gotErr, wantErr).Critical()
+	}
+
+	testutils.AssertErrorMessage(
+		t, gotErr, wantErrs[0].Error()+": "+wantFailures[0]+"\n"+wantErrs[1].Error()+": "+wantFailures[1],
+	).Critical()
+
+	testutils.AssertEqual(t, msgData == nil, true).Critical()
 }
 
 func writeMessagePass(t *testing.T, conn net.Conn, data []byte) {
@@ -79,11 +90,12 @@ func writeMessagePass(t *testing.T, conn net.Conn, data []byte) {
 	testutils.AssertErrorIs(t, err, nil).Critical()
 }
 
-func writeMessageFail(t *testing.T, conn net.Conn, data []byte, wantErrMsg string) {
+func writeMessageFail(t *testing.T, conn net.Conn, data []byte, wantErr error, wantFailure string) {
 	t.Helper()
 
-	err := protocol.WriteToConnection(conn, data)
-	testutils.AssertErrorMessage(t, err, wantErrMsg).Critical()
+	gotErr := protocol.WriteToConnection(conn, data)
+	testutils.AssertErrorIs(t, gotErr, wantErr).Critical()
+	testutils.AssertErrorMessage(t, gotErr, wantErr.Error()+" "+wantFailure).Critical()
 }
 
 func peerExchanges(clientConn net.Conn, serverConn net.Conn) []ioExchange {
@@ -94,29 +106,6 @@ func peerExchanges(clientConn net.Conn, serverConn net.Conn) []ioExchange {
 		{sender: clientPeer, receiver: serverPeer},
 		{sender: serverPeer, receiver: clientPeer},
 	}
-}
-
-func placeByteRandomly(t *testing.T, data []byte, b byte, count int) {
-	t.Helper()
-
-	n := len(data)
-
-	if count < 0 || count > n {
-		t.Fatal("failed to place byte randomly: repetition count is out of range")
-	}
-
-	for _, i := range rand.Perm(n)[:count] {
-		data[i] = b
-	}
-}
-
-func prefixBeforeMatch(data []byte, b byte) []byte {
-	result := data
-	if i := bytes.IndexByte(result, b); i >= 0 {
-		result = result[:i]
-	}
-
-	return bytes.Clone(result)
 }
 
 func TestReadFromConnection(t *testing.T) {
@@ -138,7 +127,8 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{-25}
 			timeouts := []time.Duration{-time.Millisecond, 0, time.Millisecond}
 			useBaseData := []bool{false, true}
-			wantErrMsg := "max bytes per message must be non-negative"
+			wantErr := protocol.ErrInvalidArgument
+			wantFailure := "max bytes per message must be non-negative"
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
 				for _, maxMsgBytes := range maxMsgByteValues {
@@ -154,7 +144,7 @@ func TestReadFromConnection(t *testing.T) {
 								testnetwork.ExpectBytesWritten(t, sendConn, wireData)
 							}
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg)
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure)
 
 							if includeBaseData {
 								testnetwork.ExpectBytesAvailable(
@@ -195,7 +185,8 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{protocol.MaxReadMessageBytes + 1}
 			timeouts := []time.Duration{-time.Millisecond, 0, time.Millisecond}
 			useBaseData := []bool{false, true}
-			wantErrMsg := fmt.Sprintf(
+			wantErr := protocol.ErrInvalidArgument
+			wantFailure := fmt.Sprintf(
 				"max bytes per message must be at most %d", protocol.MaxReadMessageBytes,
 			)
 
@@ -213,7 +204,7 @@ func TestReadFromConnection(t *testing.T) {
 								testnetwork.ExpectBytesWritten(t, sendConn, wireData)
 							}
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg)
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure)
 
 							if includeBaseData {
 								testnetwork.ExpectBytesAvailable(
@@ -254,7 +245,8 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{0, 25, protocol.MaxReadMessageBytes}
 			timeouts := []time.Duration{-time.Millisecond}
 			useBaseData := []bool{false, true}
-			wantErrMsg := "read timeout must be non-negative"
+			wantErr := protocol.ErrInvalidArgument
+			wantFailure := "read timeout must be non-negative"
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
 				for _, maxMsgBytes := range maxMsgByteValues {
@@ -270,7 +262,7 @@ func TestReadFromConnection(t *testing.T) {
 								testnetwork.ExpectBytesWritten(t, sendConn, wireData)
 							}
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg)
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure)
 
 							if includeBaseData {
 								testnetwork.ExpectBytesAvailable(
@@ -311,7 +303,8 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{0, 25}
 			timeouts := []time.Duration{0, readDataTimeout}
 			useBaseData := []bool{false, true}
-			wantErrMsg := func(targetErr error) string {
+			wantErr := protocol.ErrReadFailed
+			wantFailure := func(targetErr error) string {
 				return fmt.Sprintf("failed to set read deadline: %v", targetErr)
 			}
 
@@ -333,7 +326,9 @@ func TestReadFromConnection(t *testing.T) {
 							recvStub := testnetwork.NewConnStubFailingToApplyReadDeadline(
 								t, recvConn, readTimeout, randErr,
 							)
-							readMessageFail(t, recvStub, maxMsgBytes, readTimeout, wantErrMsg(randErr))
+							readMessageFail(t, recvStub, maxMsgBytes, readTimeout, wantErr, wantFailure(
+								randErr,
+							))
 
 							if includeBaseData {
 								testnetwork.ExpectBytesAvailable(
@@ -374,12 +369,14 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{0, 25}
 			timeouts := []time.Duration{0, readDataTimeout}
 			useBaseData := []bool{false, true}
-			wantErrMsg := func(
+			wantErrs := [2]error{protocol.ErrTimeout, protocol.ErrReadFailed}
+			wantFailures := func(
 				conn net.Conn, network string, address string, serverSide bool, targetErr error,
-			) string {
-				readErrMsg := "message read failed: "
-				readErrMsg += testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide)
-				return fmt.Sprintf("%s\nfailed to unset read deadline: %v", readErrMsg, targetErr)
+			) [2]string {
+				return [2]string{
+					testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide),
+					fmt.Sprintf("failed to unset read deadline: %v", targetErr),
+				}
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -400,9 +397,11 @@ func TestReadFromConnection(t *testing.T) {
 							recvStub := testnetwork.NewConnStubFailingToCancelReadDeadline(
 								t, recvConn, readTimeout, randErr,
 							)
-							readMessageFail(t, recvStub, maxMsgBytes, readTimeout, wantErrMsg(
-								recvStub, network, address, recvServer, randErr,
-							))
+							readMessageDoubleFail(
+								t, recvStub, maxMsgBytes, readTimeout, wantErrs, wantFailures(
+									recvStub, network, address, recvServer, randErr,
+								),
+							)
 
 							if includeBaseData {
 								restData := []byte{}
@@ -447,7 +446,8 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{0, 25}
 			timeouts := []time.Duration{readDataTimeout}
 			useBaseData := []bool{true}
-			wantErrMsg := func(targetErr error) string {
+			wantErr := protocol.ErrReadFailed
+			wantFailure := func(targetErr error) string {
 				return fmt.Sprintf("failed to unset read deadline: %v", targetErr)
 			}
 
@@ -469,9 +469,9 @@ func TestReadFromConnection(t *testing.T) {
 							recvStub := testnetwork.NewConnStubFailingToCancelReadDeadline(
 								t, recvConn, readTimeout, randErr,
 							)
-							readMessageErrorAfterRead(
-								t, recvStub, maxMsgBytes, readTimeout, wantErrMsg(randErr), wireData,
-							)
+							readMessageFail(t, recvStub, maxMsgBytes, readTimeout, wantErr, wantFailure(
+								randErr,
+							))
 
 							if includeBaseData {
 								testnetwork.ExpectBytesAvailable(
@@ -512,9 +512,9 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{0, 25}
 			timeouts := []time.Duration{0}
 			wireInputs := [][]byte{nil, []byte(""), testnetwork.GenerateNetProtocolMessage(t)}
-			wantErrMsg := func(conn net.Conn, network string, address string, serverSide bool) string {
-				return "message read failed: " +
-					testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide)
+			wantErr := protocol.ErrTimeout
+			wantFailure := func(conn net.Conn, network string, address string, serverSide bool) string {
+				return testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -527,8 +527,68 @@ func TestReadFromConnection(t *testing.T) {
 
 							writeMessagePass(t, sendConn, wireData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg(
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure(
 								recvConn, network, address, recvServer,
+							))
+
+							testnetwork.ExpectBytesAvailable(
+								t, recvConn, network, address, recvServer, waitForDataTimeout, append(
+									bytes.Clone(wireData), protocol.MessageEndByte,
+								),
+							)
+						}
+					}
+				}
+			}
+		}
+
+		// use individual calls instead of a loop so that each case gets isolated arguments
+		check(testnetwork.SocketTCPIPAny)
+		check(testnetwork.SocketTCPIPv4)
+		check(testnetwork.SocketTCPIPv6)
+		check(testnetwork.SocketUnixStream(t))
+		if runtime.GOOS != "windows" {
+			check(testnetwork.SocketUnixPacket(t)) // not supported on excluded platforms
+		}
+	})
+
+	t.Run("fails if data cannot be read from the connection", func(t *testing.T) {
+		check := func(e testnetwork.SocketEndpoint) {
+			defer e.Release()
+
+			listener := testnetwork.SetupSocketServer(t, e.Network, e.Address)
+			defer listener.Close()
+			network := e.Network
+			address := listener.Addr().String()
+
+			clientConn := testnetwork.ConnectToSocketServer(t, network, address)
+			defer clientConn.Close()
+
+			serverConn := testnetwork.WaitForConnectionToSocketServer(t, listener)
+			defer serverConn.Close()
+
+			maxMsgByteValues := []int{0, 25}
+			timeouts := []time.Duration{readDataTimeout}
+			wireInputs := [][]byte{nil, []byte(""), testnetwork.GenerateNetProtocolMessage(t)}
+			wantErr := protocol.ErrReadFailed
+			wantFailure := func(targetErr error) string {
+				return fmt.Sprintf("%v", targetErr)
+			}
+
+			for _, exchange := range peerExchanges(clientConn, serverConn) {
+				for _, maxMsgBytes := range maxMsgByteValues {
+					for _, readTimeout := range timeouts {
+						for _, wireData := range wireInputs {
+							sendConn := exchange.sender.baseConn
+							recvConn := exchange.receiver.baseConn
+							recvServer := exchange.receiver.isServer
+
+							writeMessagePass(t, sendConn, wireData)
+
+							randErr := testutils.GenerateError(t)
+							recvStub := testnetwork.NewConnStubFailingToRead(t, recvConn, randErr)
+							readMessageFail(t, recvStub, maxMsgBytes, readTimeout, wantErr, wantFailure(
+								randErr,
 							))
 
 							testnetwork.ExpectBytesAvailable(
@@ -577,8 +637,9 @@ func TestReadFromConnection(t *testing.T) {
 				{protocol.MessageEndByte, protocol.MessageEndByte, protocol.MessageEndByte},
 				append([]byte{protocol.MessageEndByte}, []byte("😀")...), // longer than 3 bytes
 			}
-			wantErrMsg := func(maxMsgBytes int) string {
-				return fmt.Sprintf("received message exceeds the allowed %d-byte size limit", maxMsgBytes)
+			wantErr := protocol.ErrMessageTooLarge
+			wantFailure := func(maxMsgBytes int) string {
+				return fmt.Sprintf("exceeds the allowed %d-byte limit", maxMsgBytes)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -594,7 +655,9 @@ func TestReadFromConnection(t *testing.T) {
 							testnetwork.ExpectBytesWritten(t, sendConn, maxData)
 							testnetwork.ExpectBytesWritten(t, sendConn, extraData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg(maxMsgBytes))
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure(
+								maxMsgBytes,
+							))
 
 							testnetwork.ExpectBytesAvailable(
 								t, recvConn, network, address, recvServer, waitForDataTimeout, extraData[2:],
@@ -638,8 +701,9 @@ func TestReadFromConnection(t *testing.T) {
 				{'a', protocol.MessageEndByte, protocol.MessageEndByte},
 				append([]byte{'a', protocol.MessageEndByte}, []byte("😀")...), // longer than 3 bytes
 			}
-			wantErrMsg := func(maxMsgBytes int) string {
-				return fmt.Sprintf("received message exceeds the allowed %d-byte size limit", maxMsgBytes)
+			wantErr := protocol.ErrMessageTooLarge
+			wantFailure := func(maxMsgBytes int) string {
+				return fmt.Sprintf("exceeds the allowed %d-byte limit", maxMsgBytes)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -655,7 +719,9 @@ func TestReadFromConnection(t *testing.T) {
 							testnetwork.ExpectBytesWritten(t, sendConn, maxData)
 							testnetwork.ExpectBytesWritten(t, sendConn, extraData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg(maxMsgBytes))
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure(
+								maxMsgBytes,
+							))
 
 							testnetwork.ExpectBytesAvailable(
 								t, recvConn, network, address, recvServer, waitForDataTimeout, extraData[2:],
@@ -707,7 +773,8 @@ func TestReadFromConnection(t *testing.T) {
 				[]byte("abc"),
 				append([]byte{'a', 'b'}, []byte("😀")...), // longer than 3 bytes
 			}
-			wantErrMsg := "message end marker not found"
+			wantErr := protocol.ErrMessageIncomplete
+			wantFailure := "end marker not found"
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
 				for maxMsgBytes := range maxMsgByteValues {
@@ -722,7 +789,7 @@ func TestReadFromConnection(t *testing.T) {
 							testnetwork.ExpectBytesWritten(t, sendConn, maxData)
 							testnetwork.ExpectBytesWritten(t, sendConn, extraData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg)
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure)
 
 							testnetwork.ExpectBytesAvailable(
 								t, recvConn, network, address, recvServer, waitForDataTimeout, extraData[2:],
@@ -765,8 +832,9 @@ func TestReadFromConnection(t *testing.T) {
 				{protocol.MessageEndByte, 'a'},
 				{protocol.MessageEndByte, protocol.MessageEndByte},
 			}
-			wantErrMsg := func(maxMsgBytes int) string {
-				return fmt.Sprintf("received message exceeds the allowed %d-byte size limit", maxMsgBytes)
+			wantErr := protocol.ErrMessageTooLarge
+			wantFailure := func(maxMsgBytes int) string {
+				return fmt.Sprintf("exceeds the allowed %d-byte limit", maxMsgBytes)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -782,7 +850,9 @@ func TestReadFromConnection(t *testing.T) {
 							testnetwork.ExpectBytesWritten(t, sendConn, maxData)
 							testnetwork.ExpectBytesWritten(t, sendConn, extraData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg(maxMsgBytes))
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure(
+								maxMsgBytes,
+							))
 
 							testnetwork.ExpectBytesAvailable(
 								t, recvConn, network, address, recvServer, waitForDataTimeout, []byte{},
@@ -824,8 +894,9 @@ func TestReadFromConnection(t *testing.T) {
 				// the 2nd byte is the first terminator
 				{'a', protocol.MessageEndByte},
 			}
-			wantErrMsg := func(maxMsgBytes int) string {
-				return fmt.Sprintf("received message exceeds the allowed %d-byte size limit", maxMsgBytes)
+			wantErr := protocol.ErrMessageTooLarge
+			wantFailure := func(maxMsgBytes int) string {
+				return fmt.Sprintf("exceeds the allowed %d-byte limit", maxMsgBytes)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -841,7 +912,9 @@ func TestReadFromConnection(t *testing.T) {
 							testnetwork.ExpectBytesWritten(t, sendConn, maxData)
 							testnetwork.ExpectBytesWritten(t, sendConn, extraData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg(maxMsgBytes))
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure(
+								maxMsgBytes,
+							))
 
 							testnetwork.ExpectBytesAvailable(
 								t, recvConn, network, address, recvServer, waitForDataTimeout, []byte{},
@@ -883,7 +956,8 @@ func TestReadFromConnection(t *testing.T) {
 				// the terminator is absent
 				{'a', 'b'},
 			}
-			wantErrMsg := "message end marker not found"
+			wantErr := protocol.ErrMessageIncomplete
+			wantFailure := "end marker not found"
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
 				for maxMsgBytes := range maxMsgByteValues {
@@ -898,7 +972,7 @@ func TestReadFromConnection(t *testing.T) {
 							testnetwork.ExpectBytesWritten(t, sendConn, maxData)
 							testnetwork.ExpectBytesWritten(t, sendConn, extraData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg)
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure)
 
 							testnetwork.ExpectBytesAvailable(
 								t, recvConn, network, address, recvServer, waitForDataTimeout, []byte{},
@@ -996,9 +1070,9 @@ func TestReadFromConnection(t *testing.T) {
 				// the terminator is absent
 				{'a'},
 			}
-			wantErrMsg := func(conn net.Conn, network string, address string, serverSide bool) string {
-				return "message read failed: " +
-					testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide)
+			wantErr := protocol.ErrTimeout
+			wantFailure := func(conn net.Conn, network string, address string, serverSide bool) string {
+				return testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -1014,7 +1088,7 @@ func TestReadFromConnection(t *testing.T) {
 							testnetwork.ExpectBytesWritten(t, sendConn, maxData)
 							testnetwork.ExpectBytesWritten(t, sendConn, extraData)
 
-							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErrMsg(
+							readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure(
 								recvConn, network, address, recvServer,
 							))
 
@@ -1055,9 +1129,9 @@ func TestReadFromConnection(t *testing.T) {
 			maxMsgByteValues := []int{25, 25, 25, -1} // negative value ==> nil wireData
 			bytesBelowMax := []int{0, 10, 25, 0}
 			timeouts := []time.Duration{readDataTimeout}
-			wantErrMsg := func(conn net.Conn, network string, address string, serverSide bool) string {
-				return "message read failed: " +
-					testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide)
+			wantErr := protocol.ErrTimeout
+			wantFailure := func(conn net.Conn, network string, address string, serverSide bool) string {
+				return testnetwork.FormatBytesReadTimeout(conn, network, address, serverSide)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -1075,7 +1149,7 @@ func TestReadFromConnection(t *testing.T) {
 
 						testnetwork.ExpectBytesWritten(t, sendConn, wireData)
 
-						readMessageFail(t, recvConn, max(maxMsgBytes, 0), readTimeout, wantErrMsg(
+						readMessageFail(t, recvConn, max(maxMsgBytes, 0), readTimeout, wantErr, wantFailure(
 							recvConn, network, address, recvServer,
 						))
 
@@ -1136,7 +1210,7 @@ func TestReadFromConnection(t *testing.T) {
 							if maxMsgBytes >= 0 {
 								wireLen := maxMsgBytes - bytesBelowMax[i]
 								wireData = testnetwork.GenerateSizedNetProtocolMessage(t, wireLen)
-								placeByteRandomly(t, wireData, protocol.MessageEndByte, markerCount)
+								testutils.PlaceByteRandomly(t, wireData, protocol.MessageEndByte, markerCount)
 							}
 
 							testnetwork.ExpectBytesWritten(t, sendConn, wireData)
@@ -1149,15 +1223,74 @@ func TestReadFromConnection(t *testing.T) {
 							if wireData == nil {
 								readMessagePass(t, recvConn, markerCount, readTimeout, []byte{})
 							} else {
-								readMessagePass(t, recvConn, maxMsgBytes, readTimeout, prefixBeforeMatch(
-									wireData, protocol.MessageEndByte,
-								))
+								wantData := testutils.PrefixBeforeByte(wireData, protocol.MessageEndByte)
+								readMessagePass(t, recvConn, maxMsgBytes, readTimeout, wantData)
 							}
 
 							testnetwork.ExpectBytesAvailable(
 								t, recvConn, network, address, recvServer, waitForDataTimeout, []byte{},
 							)
 						}
+					}
+				}
+			}
+		}
+
+		// use individual calls instead of a loop so that each case gets isolated arguments
+		check(testnetwork.SocketTCPIPAny)
+		check(testnetwork.SocketTCPIPv4)
+		check(testnetwork.SocketTCPIPv6)
+		check(testnetwork.SocketUnixStream(t))
+		if runtime.GOOS != "windows" {
+			check(testnetwork.SocketUnixPacket(t)) // not supported on excluded platforms
+		}
+	})
+}
+
+func TestReadFromConnectionConsecutiveReads(t *testing.T) {
+	t.Run("allows consecutive reads from a long byte stream to eventually succeed", func(t *testing.T) {
+		check := func(e testnetwork.SocketEndpoint) {
+			defer e.Release()
+
+			listener := testnetwork.SetupSocketServer(t, e.Network, e.Address)
+			defer listener.Close()
+			network := e.Network
+			address := listener.Addr().String()
+
+			clientConn := testnetwork.ConnectToSocketServer(t, network, address)
+			defer clientConn.Close()
+
+			serverConn := testnetwork.WaitForConnectionToSocketServer(t, listener)
+			defer serverConn.Close()
+
+			maxMsgByteValues := []int{25}
+			timeouts := []time.Duration{readDataTimeout}
+			wantErr := protocol.ErrMessageIncomplete
+			wantFailure := "end marker not found"
+
+			for _, exchange := range peerExchanges(clientConn, serverConn) {
+				for _, maxMsgBytes := range maxMsgByteValues {
+					for _, readTimeout := range timeouts {
+						sendConn := exchange.sender.baseConn
+						recvConn := exchange.receiver.baseConn
+						recvServer := exchange.receiver.isServer
+
+						maxData := testnetwork.GenerateSizedNetProtocolMessage(t, maxMsgBytes)
+						extraData := testnetwork.GenerateSizedNetProtocolMessage(t, 2)
+
+						testnetwork.ExpectBytesWritten(t, sendConn, maxData)
+						testnetwork.ExpectBytesWritten(t, sendConn, extraData)
+						testnetwork.ExpectBytesWritten(t, sendConn, maxData)
+						testnetwork.ExpectBytesWritten(t, sendConn, extraData)
+						writeMessagePass(t, sendConn, maxData)
+
+						readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure)
+						readMessageFail(t, recvConn, maxMsgBytes, readTimeout, wantErr, wantFailure)
+						readMessagePass(t, recvConn, maxMsgBytes, readTimeout, maxData)
+
+						testnetwork.ExpectBytesAvailable(
+							t, recvConn, network, address, recvServer, waitForDataTimeout, []byte{},
+						)
 					}
 				}
 			}
@@ -1191,8 +1324,9 @@ func TestWriteFromConnection(t *testing.T) {
 			defer serverConn.Close()
 
 			wireInputs := [][]byte{nil, []byte(""), testnetwork.GenerateNetProtocolMessage(t)}
-			wantErrMsg := func(targetErr error) string {
-				return fmt.Sprintf("data write failed: %v", targetErr)
+			wantErr := protocol.ErrWriteFailed
+			wantFailure := func(targetErr error) string {
+				return fmt.Sprintf("for data: %v", targetErr)
 			}
 
 			for _, exchange := range peerExchanges(clientConn, serverConn) {
@@ -1201,7 +1335,7 @@ func TestWriteFromConnection(t *testing.T) {
 
 					randErr := testutils.GenerateError(t)
 					recvStub := testnetwork.NewConnStubFailingToWrite(t, recvConn, randErr)
-					writeMessageFail(t, recvStub, wireData, wantErrMsg(randErr))
+					writeMessageFail(t, recvStub, wireData, wantErr, wantFailure(randErr))
 				}
 			}
 		}

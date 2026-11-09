@@ -6,6 +6,7 @@ import (
 	"sync"
 )
 
+// Numeric implements ValueAdvancer[int64] for generating successive integers.
 type Numeric struct {
 	mu      sync.RWMutex
 	counter int64

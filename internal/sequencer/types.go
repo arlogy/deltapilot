@@ -1,20 +1,14 @@
 package sequencer
 
+// ValueGenerator is a sequencer that generates values. Uniqueness of generated values depends on the
+// implementation.
 type ValueGenerator[T any] interface {
 	Next() (T, error)
 }
 
-type ValueGetter[T any] interface {
-	GetValue() (T, error)
-}
-
-type ValueSetter[T any] interface {
-	SetValue(v T) error
-}
-
-// ValueAdvancer is a sequencer that advances its current value to the next generated value.
+// ValueAdvancer is a ValueGenerator that generates the next value from its current value.
 type ValueAdvancer[T any] interface {
 	ValueGenerator[T]
-	ValueGetter[T]
-	ValueSetter[T]
+	GetValue() (T, error)
+	SetValue(v T) error
 }

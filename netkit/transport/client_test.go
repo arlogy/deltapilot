@@ -60,15 +60,19 @@ func clientDataReaders(
 
 	if successReader {
 		readerData = [][]byte{
-			// note: a server started with transport.StartServer() accepts messages up to, but not including,
-			//       protocol.MessageEndByte
+			// note: a server started with transport.StartServer(), for example via
+			//       testnetwork.StartNetServerAsync(), accepts messages up to, but not including,
+			//       protocol.MessageEndByte. Entries commented out below cause tests to fail with
+			//       "An existing connection was forcibly closed by the remote host", which is a known
+			//       behavior of the implementation.
 			nil,
 			testnetwork.GenerateNetProtocolMessage(t), // does not contain protocol.MessageEndByte
-
-			// these test inputs cause the tests to fail with the current implementation, so we'll switch to a
-			// length-prefixed message format, making netkit byte-agnostic and allowing arbitrary payloads
-			//{protocol.MessageEndByte},
-			//testutils.GenerateBytes(t), // may or may not contain protocol.MessageEndByte
+			/*{protocol.MessageEndByte},
+			func() []byte {
+				result := testutils.GenerateBytes(t) // may or may not contain protocol.MessageEndByte
+				testutils.PlaceByteRandomly(t, result, protocol.MessageEndByte, 2)
+				return result
+			}(),*/
 		}
 		for _, data := range readerData {
 			readerFuncs = append(
@@ -379,8 +383,8 @@ func TestStartClient(t *testing.T) {
 							func() string {
 								lastLog := logger.Logs[len(logger.Logs)-1]
 								if strings.HasPrefix(lastLog, formatError(
-									"failed to read server acknowledgement: message read failed: read %s",
-									network,
+									"failed to read server acknowledgement: %v: read %s",
+									protocol.ErrTimeout, network,
 								)) {
 									return lastLog
 								}

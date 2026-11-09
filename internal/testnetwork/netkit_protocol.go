@@ -14,7 +14,7 @@ func GenerateSizedNetProtocolMessage(t *testing.T, n int) []byte {
 
 	data := testutils.GenerateNBytes(t, n)
 
-	// remove message end marker; only when n != 0, to avoid bytes.ReplaceAll() returning nil
+	// remove protocol.MessageEndByte; only when n != 0, to avoid bytes.ReplaceAll() returning nil
 	if n != 0 {
 		data = bytes.ReplaceAll(data, []byte{protocol.MessageEndByte}, []byte{0x05})
 	}

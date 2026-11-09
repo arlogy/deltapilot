@@ -56,9 +56,6 @@ func NewConnStubFailingToCancelReadDeadline(
 	}
 
 	stub.StubInfo = testutils.StubInfo{
-		OverrideSequencers: map[string]sequencer.ValueAdvancer[int64]{
-			"SetReadDeadline": &sequencer.Numeric{},
-		},
 		ReturnOverrides: map[string]any{
 			"SetReadDeadline": []func(t time.Time) error{
 				func(d time.Time) error {
@@ -76,9 +73,27 @@ func NewConnStubFailingToCancelReadDeadline(
 				},
 			},
 		},
+		OverrideSequencers: map[string]sequencer.ValueAdvancer[int64]{
+			"SetReadDeadline": &sequencer.Numeric{},
+		},
 	}
 
 	return stub
+}
+
+func NewConnStubFailingToRead(t *testing.T, conn net.Conn, err error) *StubConn {
+	t.Helper()
+
+	testutils.AssertErrorNotNil(t, err).Critical()
+
+	return &StubConn{
+		Conn: conn,
+		StubInfo: testutils.StubInfo{
+			ReturnOverrides: map[string]any{
+				"Read": err,
+			},
+		},
+	}
 }
 
 func NewConnStubFailingToWrite(t *testing.T, conn net.Conn, err error) *StubConn {

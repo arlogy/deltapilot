@@ -46,6 +46,39 @@ func (c *StubConn) SetReadDeadline(t time.Time) error {
 	panic(fmt.Sprintf("no valid return override for %s", methodKey))
 }
 
+func (c *StubConn) Read(b []byte) (int, error) {
+	methodKey := "Read"
+
+	v, ok := c.ReturnOverrides[methodKey]
+	if !ok {
+		return c.Conn.Read(b)
+	}
+
+	if v == nil { // untyped nil
+		return 0, nil
+	}
+
+	if err, ok := v.(error); ok {
+		return 0, err
+	}
+
+	if fn, ok := v.(func([]byte) (int, error)); ok {
+		return fn(b)
+	}
+
+	if fns, ok := v.([]func([]byte) (int, error)); ok {
+		if seq, ok := c.OverrideSequencers[methodKey]; ok && seq != nil {
+			if i, err := seq.GetValue(); err == nil && i >= 0 && i < int64(len(fns)) {
+				if j, err := seq.Next(); err == nil && j == i+1 {
+					return fns[i](b)
+				}
+			}
+		}
+	}
+
+	panic(fmt.Sprintf("no valid return override for %s", methodKey))
+}
+
 func (c *StubConn) Write(b []byte) (int, error) {
 	methodKey := "Write"
 
